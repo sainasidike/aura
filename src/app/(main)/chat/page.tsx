@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getProfileById, type StoredProfile } from '@/lib/storage';
+import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -38,7 +38,7 @@ export default function ChatPage() {
 
 function ChatContent() {
   const searchParams = useSearchParams();
-  const profileId = searchParams.get('profileId');
+  const paramProfileId = searchParams.get('profileId');
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [chartData, setChartData] = useState<Record<string, unknown> | null>(null);
@@ -48,13 +48,19 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!profileId) return;
-    const p = getProfileById(profileId);
+    let p: StoredProfile | undefined;
+    if (paramProfileId) {
+      p = getProfileById(paramProfileId);
+    }
+    if (!p) {
+      const all = getProfiles();
+      if (all.length > 0) p = all[0];
+    }
     if (p) {
       setProfile(p);
       fetchChartData(p);
     }
-  }, [profileId]);
+  }, [paramProfileId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -162,12 +168,12 @@ function ChatContent() {
     setStreaming(false);
   };
 
-  if (!profileId) {
+  if (!profile) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
           <p className="mb-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            请先选择一个档案
+            请先创建一个档案
           </p>
           <Link
             href="/profile"
@@ -212,7 +218,7 @@ function ChatContent() {
             )}
           </div>
           <Link
-            href={`/chart?profileId=${profileId}`}
+            href="/chart"
             className="text-xs"
             style={{ color: 'var(--text-tertiary)' }}
           >

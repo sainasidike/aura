@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CITIES, searchCity } from '@/lib/cities';
 import { getProfiles, addProfile, deleteProfile, type StoredProfile } from '@/lib/storage';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [profiles, setProfiles] = useState<StoredProfile[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -15,10 +17,14 @@ export default function ProfilePage() {
   });
   const [citySearch, setCitySearch] = useState('');
   const [cityResults, setCityResults] = useState(CITIES.slice(0, 10));
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setProfiles(getProfiles());
+    const ps = getProfiles();
+    setProfiles(ps);
+    // 如果没有档案，自动展开表单
+    if (ps.length === 0) setShowForm(true);
   }, []);
 
   useEffect(() => {
@@ -33,16 +39,15 @@ export default function ProfilePage() {
     e.preventDefault();
     setLoading(true);
     const cityData = CITIES.find(c => c.name === form.city);
-    const profile = addProfile({
+    addProfile({
       ...form,
       longitude: cityData?.longitude ?? 116.40,
       latitude: cityData?.latitude ?? 39.90,
       timezone: cityData?.timezone ?? 'Asia/Shanghai',
     });
-    setProfiles(prev => [profile, ...prev]);
-    setShowForm(false);
-    setForm({ name: '', gender: '男', year: 1990, month: 1, day: 1, hour: 12, minute: 0, city: '北京' });
     setLoading(false);
+    // 创建后自动跳转到运势页
+    router.push('/fortune');
   };
 
   const handleDelete = (id: string) => {
@@ -115,28 +120,38 @@ export default function ProfilePage() {
                 <div className="relative">
                   <input
                     type="text"
-                    value={citySearch || form.city}
-                    onChange={e => setCitySearch(e.target.value)}
-                    onFocus={() => setCitySearch('')}
+                    value={showCityDropdown ? citySearch : form.city}
+                    onChange={e => { setCitySearch(e.target.value); setShowCityDropdown(true); }}
+                    onFocus={() => { setShowCityDropdown(true); setCitySearch(''); }}
+                    onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
+                    placeholder="搜索城市名或省份..."
                     className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
                     style={inputStyle}
                   />
-                  {citySearch !== '' && (
+                  {showCityDropdown && (
                     <div
-                      className="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border"
+                      className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border shadow-lg"
                       style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}
                     >
-                      {cityResults.map(c => (
+                      {cityResults.length > 0 ? cityResults.map(c => (
                         <button
                           key={c.name}
                           type="button"
-                          onClick={() => { setForm({ ...form, city: c.name }); setCitySearch(''); }}
-                          className="block w-full px-3 py-1.5 text-left text-sm hover:opacity-80"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setForm({ ...form, city: c.name }); setCitySearch(''); setShowCityDropdown(false); }}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition"
                           style={{ color: 'var(--text-primary)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                         >
-                          {c.name} <span style={{ color: 'var(--text-tertiary)' }}>{c.province}</span>
+                          <span>{c.name}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{c.province}</span>
                         </button>
-                      ))}
+                      )) : (
+                        <div className="px-3 py-3 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          未找到「{citySearch}」，请尝试省份名或其他城市
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

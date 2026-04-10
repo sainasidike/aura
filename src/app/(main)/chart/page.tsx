@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getProfileById, type StoredProfile } from '@/lib/storage';
+import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
 import type { BaziChart, ZiweiChart, AstrologyChart, TimeStandardization } from '@/types';
 
 type Tab = 'bazi' | 'ziwei' | 'astrology';
@@ -18,7 +18,7 @@ export default function ChartPage() {
 
 function ChartContent() {
   const searchParams = useSearchParams();
-  const profileId = searchParams.get('profileId');
+  const paramProfileId = searchParams.get('profileId');
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [tab, setTab] = useState<Tab>('bazi');
@@ -29,10 +29,14 @@ function ChartContent() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!profileId) return;
-    const p = getProfileById(profileId);
-    if (p) setProfile(p);
-  }, [profileId]);
+    if (paramProfileId) {
+      const p = getProfileById(paramProfileId);
+      if (p) { setProfile(p); return; }
+    }
+    // 没有 URL 参数时，自动加载第一个档案
+    const all = getProfiles();
+    if (all.length > 0) setProfile(all[0]);
+  }, [paramProfileId]);
 
   const fetchChart = async (type: Tab) => {
     if (!profile) return;
@@ -67,11 +71,11 @@ function ChartContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, tab]);
 
-  if (!profileId) {
+  if (!profile) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
-          <p className="mb-4" style={{ color: 'var(--text-tertiary)' }}>请先选择一个档案</p>
+          <p className="mb-4" style={{ color: 'var(--text-tertiary)' }}>请先创建一个档案</p>
           <Link
             href="/profile"
             className="rounded-lg px-4 py-2 text-sm"
@@ -88,7 +92,7 @@ function ChartContent() {
     <div className="min-h-screen px-4 py-8 pb-24">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/profile" className="text-sm" style={{ color: 'var(--text-tertiary)' }}>&larr; 档案</Link>
+          <Link href="/fortune" className="text-sm" style={{ color: 'var(--text-tertiary)' }}>&larr; 返回</Link>
           {profile && (
             <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
               {profile.name} · {profile.year}.{profile.month}.{profile.day} {String(profile.hour).padStart(2, '0')}:{String(profile.minute).padStart(2, '0')} · {profile.city}

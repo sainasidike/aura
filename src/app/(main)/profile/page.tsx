@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CITIES, searchCity } from '@/lib/cities';
 import { getProfiles, addProfile, deleteProfile, type StoredProfile } from '@/lib/storage';
 
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>加载中...</div>}>
+      <ProfileContent />
+    </Suspense>
+  );
+}
+
+function ProfileContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [profiles, setProfiles] = useState<StoredProfile[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -20,12 +29,21 @@ export default function ProfilePage() {
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 根据年月计算当月天数
+  const daysInMonth = new Date(form.year, form.month, 0).getDate();
+  // 如果当前选择的日超出该月天数，自动修正
+  useEffect(() => {
+    if (form.day > daysInMonth) {
+      setForm(prev => ({ ...prev, day: daysInMonth }));
+    }
+  }, [form.year, form.month, form.day, daysInMonth]);
+
   useEffect(() => {
     const ps = getProfiles();
     setProfiles(ps);
-    // 如果没有档案，自动展开表单
-    if (ps.length === 0) setShowForm(true);
-  }, []);
+    // 如果没有档案或从运势页点击「添加」，自动展开表单
+    if (ps.length === 0 || searchParams.get('showForm') === 'true') setShowForm(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (citySearch) {
@@ -50,7 +68,8 @@ export default function ProfilePage() {
     router.push('/fortune');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: string, name: string) => {
+    if (!window.confirm(`确定删除「${name}」的档案吗？此操作不可撤销。`)) return;
     deleteProfile(id);
     setProfiles(prev => prev.filter(p => p.id !== id));
   };
@@ -184,7 +203,7 @@ export default function ProfilePage() {
                   className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
                   style={inputStyle}
                 >
-                  {Array.from({ length: 31 }, (_, i) => (
+                  {Array.from({ length: daysInMonth }, (_, i) => (
                     <option key={i + 1} value={i + 1}>{i + 1}日</option>
                   ))}
                 </select>
@@ -248,7 +267,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => handleDelete(p.id)}
+                  onClick={() => handleDelete(p.id, p.name)}
                   className="text-xs hover:opacity-80"
                   style={{ color: 'var(--error)' }}
                 >

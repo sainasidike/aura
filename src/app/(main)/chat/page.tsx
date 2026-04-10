@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
 
 interface Message {
@@ -46,6 +47,10 @@ function ChatContent() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const profileIdRef = useRef<string | null>(null);
+
+  // 从 localStorage 恢复对话历史
+  const chatStorageKey = (id: string) => `aura_chat_${id}`;
 
   useEffect(() => {
     let p: StoredProfile | undefined;
@@ -58,13 +63,25 @@ function ChatContent() {
     }
     if (p) {
       setProfile(p);
+      profileIdRef.current = p.id;
       fetchChartData(p);
+      // 恢复对话历史
+      try {
+        const saved = localStorage.getItem(chatStorageKey(p.id));
+        if (saved) setMessages(JSON.parse(saved));
+      } catch { /* ignore */ }
     }
   }, [paramProfileId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    // 保存对话历史（仅在非流式且有消息时）
+    if (!streaming && messages.length > 0 && profileIdRef.current) {
+      try {
+        localStorage.setItem(chatStorageKey(profileIdRef.current), JSON.stringify(messages));
+      } catch { /* ignore */ }
+    }
+  }, [messages, streaming]);
 
   const fetchChartData = async (p: StoredProfile) => {
     try {
@@ -280,7 +297,13 @@ function ChatContent() {
                       }
                 }
               >
-                <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
+                <div className={msg.role === 'assistant' ? 'prose-chat' : 'whitespace-pre-wrap'}>
+                  {msg.role === 'assistant' ? (
+                    msg.content ? <ReactMarkdown>{msg.content}</ReactMarkdown> : '...'
+                  ) : (
+                    msg.content || '...'
+                  )}
+                </div>
               </div>
             </div>
           ))}

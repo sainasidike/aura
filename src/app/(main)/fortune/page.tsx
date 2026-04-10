@@ -274,7 +274,7 @@ export default function FortunePage() {
         persons={persons}
         activeId={activeId}
         onSelect={setActiveId}
-        onAdd={() => window.location.href = "/profile"}
+        onAdd={() => window.location.href = "/profile?showForm=true"}
       />
 
       {/* Period tabs */}

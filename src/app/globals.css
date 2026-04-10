@@ -114,3 +114,39 @@ select option {
   background: var(--bg-base);
   color: var(--text-primary);
 }
+
+/* Chat markdown prose */
+.prose-chat {
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+.prose-chat h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+  color: var(--text-primary);
+}
+.prose-chat h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+.prose-chat p {
+  margin-bottom: 0.5rem;
+}
+.prose-chat strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.prose-chat ul, .prose-chat ol {
+  padding-left: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+.prose-chat li {
+  margin-bottom: 0.2rem;
+}
+.prose-chat li::marker {
+  color: var(--text-tertiary);
+}

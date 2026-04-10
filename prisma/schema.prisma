@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  name      String
+  gender    String   // 男/女
+  year      Int
+  month     Int
+  day       Int
+  hour      Int
+  minute    Int
+  city      String
+  longitude Float
+  latitude  Float
+  timezone  String   @default("Asia/Shanghai")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  charts       ChartCache[]
+  conversations Conversation[]
+}
+
+model ChartCache {
+  id        String   @id @default(cuid())
+  profileId String
+  chartType String   // bazi / ziwei / astrology
+  config    String   // JSON: 子时模式、四化版本等配置
+  result    String   // JSON: 排盘结果
+  version   String   // 库版本签名
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, chartType, config])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  profileId String
+  title     String   @default("新对话")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile  Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user / assistant / system
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}

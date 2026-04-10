@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { getProfiles, type StoredProfile } from "@/lib/storage";
 import PersonSelector from "@/components/ui/PersonSelector";
@@ -97,6 +98,7 @@ export default function FortunePage() {
   const [interpreting, setInterpreting] = useState(false);
   const [interpretDone, setInterpretDone] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const ps = getProfiles();
@@ -259,7 +261,7 @@ export default function FortunePage() {
         </h1>
         <div className="flex items-center gap-2">
           <motion.button
-            onClick={() => window.location.href = "/profile"}
+            onClick={() => router.push("/profile")}
             className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
             style={{ background: "var(--bg-base)", border: "1px solid var(--border-subtle)", color: "var(--text-tertiary)" }}
             whileTap={{ scale: 0.9 }}
@@ -274,7 +276,7 @@ export default function FortunePage() {
         persons={persons}
         activeId={activeId}
         onSelect={setActiveId}
-        onAdd={() => window.location.href = "/profile?showForm=true"}
+        onAdd={() => router.push("/profile?showForm=true")}
       />
 
       {/* Period tabs */}

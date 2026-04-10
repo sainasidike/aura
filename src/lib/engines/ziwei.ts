@@ -17,9 +17,9 @@ const SIHUA_MAP: Record<string, string> = {
   '祿': '化禄', '權': '化权', '科': '化科', '忌': '化忌',
 };
 
-/** 时辰 → 繁体时辰名映射 */
+/** 时辰 → 繁体时辰名映射 (fortel 将子时分为早子時/夜子時) */
 const SHICHEN_MAP: Record<string, string> = {
-  '子': '子時', '丑': '丑時', '寅': '寅時', '卯': '卯時',
+  '丑': '丑時', '寅': '寅時', '卯': '卯時',
   '辰': '辰時', '巳': '巳時', '午': '午時', '未': '未時',
   '申': '申時', '酉': '酉時', '戌': '戌時', '亥': '亥時',
 };
@@ -32,9 +32,15 @@ export function calculateZiwei(
   birthYear: number, birthMonth: number, birthDay: number,
   gender: '男' | '女',
 ): ZiweiChart {
-  const shichenTC = SHICHEN_MAP[timeInfo.shichen];
-  if (!shichenTC) {
-    throw new Error(`无效时辰: ${timeInfo.shichen}`);
+  // fortel 将子时分为：早子時 (00:00-01:00) 和 夜子時 (23:00-00:00)
+  let shichenTC: string;
+  if (timeInfo.shichen === '子') {
+    shichenTC = timeInfo.trueSolarTime.hour >= 23 ? '夜子時' : '早子時';
+  } else {
+    shichenTC = SHICHEN_MAP[timeInfo.shichen];
+    if (!shichenTC) {
+      throw new Error(`无效时辰: ${timeInfo.shichen}`);
+    }
   }
 
   const board = new DestinyBoard(

@@ -10,7 +10,7 @@ type Tab = 'bazi' | 'ziwei' | 'astrology';
 
 export default function ChartPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-purple-300/40">加载中...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>加载中...</div>}>
       <ChartContent />
     </Suspense>
   );
@@ -71,8 +71,12 @@ function ChartContent() {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-purple-300/60 mb-4">请先选择一个档案</p>
-          <Link href="/profile" className="rounded-lg bg-purple-600 px-4 py-2 text-sm hover:bg-purple-500">
+          <p className="mb-4" style={{ color: 'var(--text-tertiary)' }}>请先选择一个档案</p>
+          <Link
+            href="/profile"
+            className="rounded-lg px-4 py-2 text-sm"
+            style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}
+          >
             前往档案管理
           </Link>
         </div>
@@ -81,12 +85,12 @@ function ChartContent() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-8">
+    <div className="min-h-screen px-4 py-8 pb-24">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/profile" className="text-purple-300/60 hover:text-purple-200 text-sm">&larr; 档案</Link>
+          <Link href="/profile" className="text-sm" style={{ color: 'var(--text-tertiary)' }}>&larr; 档案</Link>
           {profile && (
-            <p className="text-sm text-purple-300/60">
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
               {profile.name} · {profile.year}.{profile.month}.{profile.day} {String(profile.hour).padStart(2, '0')}:{String(profile.minute).padStart(2, '0')} · {profile.city}
             </p>
           )}
@@ -98,19 +102,19 @@ function ChartContent() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                tab === t
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white/5 text-purple-300/60 hover:bg-white/10'
-              }`}
+              className="rounded-lg px-4 py-2 text-sm font-medium transition"
+              style={tab === t
+                ? { background: 'var(--accent-primary)', color: 'var(--text-inverse)' }
+                : { background: 'var(--bg-surface)', color: 'var(--text-tertiary)' }
+              }
             >
               {label}
             </button>
           ))}
         </div>
 
-        {loading && <div className="text-center py-12 text-purple-300/40">计算中...</div>}
-        {error && <div className="text-center py-12 text-red-400">{error}</div>}
+        {loading && <div className="text-center py-12" style={{ color: 'var(--text-tertiary)' }}>计算中...</div>}
+        {error && <div className="text-center py-12" style={{ color: 'var(--error)' }}>{error}</div>}
 
         {/* 八字展示 */}
         {tab === 'bazi' && baziData && !loading && (
@@ -138,17 +142,20 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
   return (
     <div className="space-y-6">
       {/* 时间修正信息 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
-        <div className="flex items-center gap-2 text-purple-300/80">
+      <div
+        className="rounded-xl p-4 text-sm"
+        style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+      >
+        <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
           <span>真太阳时: {String(timeInfo.trueSolarTime.hour).padStart(2, '0')}:{String(timeInfo.trueSolarTime.minute).padStart(2, '0')}</span>
-          <span className="text-white/20">|</span>
+          <span style={{ color: 'var(--border-default)' }}>|</span>
           <span>{timeInfo.shichenName}</span>
-          <span className="text-white/20">|</span>
+          <span style={{ color: 'var(--border-default)' }}>|</span>
           <span>修正 {timeInfo.totalCorrection > 0 ? '+' : ''}{Math.round(timeInfo.totalCorrection)}分</span>
-          {timeInfo.isDST && <span className="rounded bg-yellow-600/30 px-1.5 text-yellow-300 text-xs">夏令时</span>}
+          {timeInfo.isDST && <span className="rounded px-1.5 text-xs" style={{ background: 'rgba(192,144,48,0.15)', color: 'var(--warning)' }}>夏令时</span>}
         </div>
         {timeInfo.nearBoundary && (
-          <p className="mt-2 text-xs text-yellow-400/80">{timeInfo.boundaryWarning}</p>
+          <p className="mt-2 text-xs" style={{ color: 'var(--warning)' }}>{timeInfo.boundaryWarning}</p>
         )}
       </div>
 
@@ -156,7 +163,7 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
       <div className="overflow-x-auto">
         <table className="w-full text-center">
           <thead>
-            <tr className="text-sm text-purple-300/60">
+            <tr className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
               <td className="p-2"></td>
               <td className="p-2">年柱</td>
               <td className="p-2">月柱</td>
@@ -164,37 +171,37 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
               <td className="p-2">时柱</td>
             </tr>
           </thead>
-          <tbody className="text-purple-100">
-            <tr className="text-xs text-purple-400/60">
-              <td className="p-1 text-right text-purple-300/40">十神</td>
+          <tbody style={{ color: 'var(--text-primary)' }}>
+            <tr className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              <td className="p-1 text-right" style={{ color: 'var(--text-tertiary)' }}>十神</td>
               <td className="p-1">{chart.shiShen.tianGan.year}</td>
               <td className="p-1">{chart.shiShen.tianGan.month}</td>
               <td className="p-1">{chart.shiShen.tianGan.day}</td>
               <td className="p-1">{chart.shiShen.tianGan.time}</td>
             </tr>
             <tr className="text-xl sm:text-2xl font-bold">
-              <td className="p-1.5 sm:p-2 text-right text-sm font-normal text-purple-300/40">天干</td>
+              <td className="p-1.5 sm:p-2 text-right text-sm font-normal" style={{ color: 'var(--text-tertiary)' }}>天干</td>
               <td className="p-1.5 sm:p-2">{p.year.gan}</td>
               <td className="p-1.5 sm:p-2">{p.month.gan}</td>
-              <td className="p-1.5 sm:p-2 text-amber-300">{p.day.gan}</td>
+              <td className="p-1.5 sm:p-2" style={{ color: 'var(--accent-warm)' }}>{p.day.gan}</td>
               <td className="p-1.5 sm:p-2">{p.time.gan}</td>
             </tr>
             <tr className="text-xl sm:text-2xl font-bold">
-              <td className="p-1.5 sm:p-2 text-right text-sm font-normal text-purple-300/40">地支</td>
+              <td className="p-1.5 sm:p-2 text-right text-sm font-normal" style={{ color: 'var(--text-tertiary)' }}>地支</td>
               <td className="p-1.5 sm:p-2">{p.year.zhi}</td>
               <td className="p-1.5 sm:p-2">{p.month.zhi}</td>
               <td className="p-1.5 sm:p-2">{p.day.zhi}</td>
               <td className="p-1.5 sm:p-2">{p.time.zhi}</td>
             </tr>
-            <tr className="text-xs text-purple-400/60">
-              <td className="p-1 text-right text-purple-300/40">藏干</td>
+            <tr className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              <td className="p-1 text-right" style={{ color: 'var(--text-tertiary)' }}>藏干</td>
               <td className="p-1">{chart.hideGan.year.join(' ')}</td>
               <td className="p-1">{chart.hideGan.month.join(' ')}</td>
               <td className="p-1">{chart.hideGan.day.join(' ')}</td>
               <td className="p-1">{chart.hideGan.time.join(' ')}</td>
             </tr>
-            <tr className="text-xs text-purple-400/50">
-              <td className="p-1 text-right text-purple-300/40">纳音</td>
+            <tr className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              <td className="p-1 text-right" style={{ color: 'var(--text-tertiary)' }}>纳音</td>
               <td className="p-1">{chart.nayin.year}</td>
               <td className="p-1">{chart.nayin.month}</td>
               <td className="p-1">{chart.nayin.day}</td>
@@ -206,33 +213,33 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
 
       {/* 补充信息 */}
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-purple-300/60">农历</p>
-          <p className="text-purple-100">{chart.lunarDate}</p>
+        <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <p style={{ color: 'var(--text-tertiary)' }}>农历</p>
+          <p style={{ color: 'var(--text-primary)' }}>{chart.lunarDate}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-purple-300/60">生肖</p>
-          <p className="text-purple-100">{chart.shengXiao}</p>
+        <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <p style={{ color: 'var(--text-tertiary)' }}>生肖</p>
+          <p style={{ color: 'var(--text-primary)' }}>{chart.shengXiao}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-purple-300/60">命宫</p>
-          <p className="text-purple-100">{chart.mingGong}</p>
+        <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <p style={{ color: 'var(--text-tertiary)' }}>命宫</p>
+          <p style={{ color: 'var(--text-primary)' }}>{chart.mingGong}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-purple-300/60">身宫</p>
-          <p className="text-purple-100">{chart.shenGong}</p>
+        <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <p style={{ color: 'var(--text-tertiary)' }}>身宫</p>
+          <p style={{ color: 'var(--text-primary)' }}>{chart.shenGong}</p>
         </div>
       </div>
 
       {/* 大运 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <p className="mb-3 text-sm text-purple-300/60">大运</p>
+      <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+        <p className="mb-3 text-sm" style={{ color: 'var(--text-tertiary)' }}>大运</p>
         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-2">
           {chart.dayun.map((d, i) => (
-            <div key={i} className="rounded-lg bg-white/5 px-2 py-1.5 text-center">
-              <p className="text-xs text-purple-300/50">{d.startAge}岁</p>
-              <p className="font-medium text-purple-100">{d.ganZhi}</p>
-              <p className="text-xs text-purple-300/40">{d.startYear}</p>
+            <div key={i} className="rounded-lg px-2 py-1.5 text-center" style={{ background: 'var(--bg-hover)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{d.startAge}岁</p>
+              <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{d.ganZhi}</p>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{d.startYear}</p>
             </div>
           ))}
         </div>
@@ -247,16 +254,19 @@ function ZiweiDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: 
   return (
     <div className="space-y-6">
       {/* 基本信息 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
-        <div className="flex items-center gap-4 text-purple-300/80">
-          <span>命主: <strong className="text-purple-100">{chart.destinyMaster}</strong></span>
-          <span>身主: <strong className="text-purple-100">{chart.bodyMaster}</strong></span>
-          <span>五行局: <strong className="text-purple-100">{chart.element}</strong></span>
+      <div
+        className="rounded-xl p-4 text-sm"
+        style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+      >
+        <div className="flex items-center gap-4" style={{ color: 'var(--text-secondary)' }}>
+          <span>命主: <strong style={{ color: 'var(--text-primary)' }}>{chart.destinyMaster}</strong></span>
+          <span>身主: <strong style={{ color: 'var(--text-primary)' }}>{chart.bodyMaster}</strong></span>
+          <span>五行局: <strong style={{ color: 'var(--text-primary)' }}>{chart.element}</strong></span>
         </div>
-        <div className="mt-2 flex items-center gap-2 text-purple-300/60 text-xs">
+        <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
           <span>真太阳时: {String(timeInfo.trueSolarTime.hour).padStart(2, '0')}:{String(timeInfo.trueSolarTime.minute).padStart(2, '0')}</span>
           <span>{timeInfo.shichenName}</span>
-          {timeInfo.isDST && <span className="rounded bg-yellow-600/30 px-1.5 text-yellow-300">夏令时</span>}
+          {timeInfo.isDST && <span className="rounded px-1.5" style={{ background: 'rgba(192,144,48,0.15)', color: 'var(--warning)' }}>夏令时</span>}
         </div>
       </div>
 
@@ -265,15 +275,16 @@ function ZiweiDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: 
         {chart.cells.map((cell, i) => (
           <div
             key={i}
-            className={`rounded-xl border p-3 ${
+            className="rounded-xl p-3"
+            style={
               cell.temples.some(t => t.includes('命宫'))
-                ? 'border-amber-400/30 bg-amber-400/5'
-                : 'border-white/10 bg-white/5'
-            }`}
+                ? { border: '1px solid var(--accent-warm-dim)', background: 'rgba(184,150,62,0.05)' }
+                : { border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }
+            }
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs text-purple-300/50">{cell.ground}</span>
-              <span className="text-sm font-medium text-purple-200">
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{cell.ground}</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                 {cell.temples.join(' / ')}
               </span>
             </div>
@@ -281,24 +292,27 @@ function ZiweiDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: 
               {cell.majorStars.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {cell.majorStars.map((s, j) => (
-                    <span key={j} className={`rounded px-1.5 py-0.5 text-sm font-medium ${
-                      s.fourInfluence
-                        ? 'bg-purple-500/20 text-purple-200'
-                        : 'text-purple-100'
-                    }`}>
+                    <span
+                      key={j}
+                      className="rounded px-1.5 py-0.5 text-sm font-medium"
+                      style={s.fourInfluence
+                        ? { background: 'var(--accent-primary-dim)', color: 'var(--text-primary)' }
+                        : { color: 'var(--text-primary)' }
+                      }
+                    >
                       {s.name}
                       {s.fourInfluence && (
-                        <span className="ml-0.5 text-xs text-amber-300">{s.fourInfluence}</span>
+                        <span className="ml-0.5 text-xs" style={{ color: 'var(--accent-warm)' }}>{s.fourInfluence}</span>
                       )}
                     </span>
                   ))}
                 </div>
               ) : (
-                <span className="text-xs text-purple-300/30">无主星</span>
+                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>无主星</span>
               )}
             </div>
             {cell.minorStars.length > 0 && (
-              <div className="mt-1 text-xs text-purple-300/50">
+              <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 {cell.minorStars.map(s => s.name).join(' · ')}
               </div>
             )}
@@ -318,33 +332,39 @@ function AstrologyDisplay({ data }: { data: { timeInfo: TimeStandardization; cha
   return (
     <div className="space-y-6">
       {/* 上升点 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
-        <span className="text-purple-300/80">
-          上升星座: <strong className="text-purple-100">{ascSign} {ascDeg}°</strong>
+      <div
+        className="rounded-xl p-4 text-sm"
+        style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+      >
+        <span style={{ color: 'var(--text-secondary)' }}>
+          上升星座: <strong style={{ color: 'var(--text-primary)' }}>{ascSign} {ascDeg}°</strong>
         </span>
       </div>
 
       {/* 行星表格 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+      >
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-purple-300/60">
+            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-tertiary)' }}>
               <th className="px-4 py-2.5 text-left font-medium">行星</th>
               <th className="px-4 py-2.5 text-left font-medium">星座</th>
               <th className="px-4 py-2.5 text-left font-medium">度数</th>
               <th className="px-4 py-2.5 text-left font-medium">宫位</th>
             </tr>
           </thead>
-          <tbody className="text-purple-100">
+          <tbody style={{ color: 'var(--text-primary)' }}>
             {chart.planets.map((p, i) => (
-              <tr key={i} className="border-b border-white/5">
+              <tr key={i} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td className="px-4 py-2">
                   {p.name}
-                  {p.retrograde && <span className="ml-1 text-xs text-red-400">R</span>}
+                  {p.retrograde && <span className="ml-1 text-xs" style={{ color: 'var(--error)' }}>R</span>}
                 </td>
                 <td className="px-4 py-2">{p.sign}</td>
-                <td className="px-4 py-2 text-purple-300/70">{p.degree}°{p.minute}&apos;</td>
-                <td className="px-4 py-2 text-purple-300/70">第{p.house}宫</td>
+                <td className="px-4 py-2" style={{ color: 'var(--text-secondary)' }}>{p.degree}°{p.minute}&apos;</td>
+                <td className="px-4 py-2" style={{ color: 'var(--text-secondary)' }}>第{p.house}宫</td>
               </tr>
             ))}
           </tbody>
@@ -352,22 +372,31 @@ function AstrologyDisplay({ data }: { data: { timeInfo: TimeStandardization; cha
       </div>
 
       {/* 相位 */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <p className="mb-3 text-sm text-purple-300/60">主要相位</p>
+      <div
+        className="rounded-xl p-4"
+        style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+      >
+        <p className="mb-3 text-sm" style={{ color: 'var(--text-tertiary)' }}>主要相位</p>
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {chart.aspects.map((a, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="text-purple-100">{a.planet1}</span>
+              <span style={{ color: 'var(--text-primary)' }}>{a.planet1}</span>
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                a.type === '合相' ? 'bg-blue-500/20 text-blue-300' :
-                a.type === '三合' || a.type === '六合' ? 'bg-green-500/20 text-green-300' :
-                a.type === '四分' || a.type === '对冲' ? 'bg-red-500/20 text-red-300' :
-                'bg-white/10 text-white/60'
-              }`}>
+                a.type === '合相' ? 'bg-blue-500/20 text-blue-600' :
+                a.type === '三合' || a.type === '六合' ? 'bg-green-500/20 text-green-600' :
+                a.type === '四分' || a.type === '对冲' ? 'bg-red-500/20 text-red-600' :
+                ''
+              }`}
+              style={
+                !(a.type === '合相' || a.type === '三合' || a.type === '六合' || a.type === '四分' || a.type === '对冲')
+                  ? { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }
+                  : undefined
+              }
+              >
                 {a.type}
               </span>
-              <span className="text-purple-100">{a.planet2}</span>
-              <span className="text-xs text-purple-300/40">{a.orb}°</span>
+              <span style={{ color: 'var(--text-primary)' }}>{a.planet2}</span>
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{a.orb}°</span>
             </div>
           ))}
         </div>

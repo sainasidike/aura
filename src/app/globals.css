@@ -1,22 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 @import "tailwindcss";
 
-/* 自定义滚动条 */
+:root {
+  /* Background */
+  --bg-deep: #f5f3fa;
+  --bg-base: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-surface: #f8f6fc;
+  --bg-hover: #eee9f8;
+
+  /* Accent */
+  --accent-primary: #7b6cb8;
+  --accent-primary-light: #9b8ed8;
+  --accent-primary-dim: rgba(123,108,184,0.10);
+  --accent-primary-glow: rgba(123,108,184,0.20);
+  --accent-secondary: #3abfb6;
+  --accent-secondary-light: #5ed8cf;
+  --accent-secondary-dim: rgba(58,191,182,0.10);
+  --accent-warm: #b8963e;
+  --accent-warm-light: #d4b060;
+  --accent-warm-dim: rgba(184,150,62,0.10);
+  --accent-rose: #b86ca0;
+  --accent-rose-light: #d08cbc;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #7b6cb8 0%, #9b8ed8 50%, #5ed8cf 100%);
+  --gradient-warm: linear-gradient(135deg, #b8963e 0%, #d4b060 50%, #d08cbc 100%);
+  --gradient-surface: linear-gradient(145deg, #ffffff 0%, #f5f0ff 50%, #edf8f7 100%);
+  --gradient-card: linear-gradient(160deg, #ffffff 0%, #f8f4ff 40%, #f0faf9 100%);
+  --gradient-hero: linear-gradient(180deg, #ede8f8 0%, #e2ddf5 30%, #daeef0 70%, #f0ecf9 100%);
+
+  /* Text */
+  --text-primary: #1a1528;
+  --text-secondary: #5c5470;
+  --text-tertiary: #9890a8;
+  --text-inverse: #ffffff;
+
+  /* Semantic */
+  --success: #2da89e;
+  --warning: #c09030;
+  --error: #c05060;
+  --info: #7b6cb8;
+
+  /* Borders */
+  --border-subtle: rgba(123,108,184,0.08);
+  --border-default: rgba(123,108,184,0.15);
+  --border-strong: rgba(123,108,184,0.25);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(123,108,184,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(123,108,184,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 32px rgba(123,108,184,0.10), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-card: 0 2px 12px rgba(123,108,184,0.06), 0 1px 3px rgba(0,0,0,0.03);
+
+  /* Fonts */
+  --font-display: 'Noto Serif SC', Georgia, serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+  --font-cn-display: 'Noto Serif SC', SimSun, serif;
+  --font-cn-body: 'Noto Sans SC', 'PingFang SC', sans-serif;
+}
+
+@theme inline {
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-hover: var(--bg-hover);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-primary-light: var(--accent-primary-light);
+  --color-accent-primary-dim: var(--accent-primary-dim);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-rose: var(--accent-rose);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-cn-display: var(--font-cn-display);
+  --font-cn-body: var(--font-cn-body);
+}
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(168, 85, 247, 0.2);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(168, 85, 247, 0.4);
+  background: rgba(123,108,184,0.15);
+  border-radius: 2px;
 }
 
-/* select 下拉框深色背景 */
+/* Select styling */
 select option {
-  background: #1e1033;
-  color: #fff;
+  background: var(--bg-base);
+  color: var(--text-primary);
 }

@@ -50,65 +50,91 @@ export default function ProfilePage() {
     setProfiles(prev => prev.filter(p => p.id !== id));
   };
 
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    borderColor: 'var(--border-subtle)',
+    color: 'var(--text-primary)',
+  };
+
   return (
-    <div className="min-h-screen px-4 py-8">
+    <div className="min-h-screen px-4 py-8 pb-24">
       <div className="mx-auto max-w-lg">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/" className="text-purple-300/60 hover:text-purple-200 text-sm">&larr; 返回</Link>
-          <h1 className="text-xl font-semibold text-purple-100">个人档案</h1>
+          <Link
+            href="/"
+            className="text-sm hover:opacity-70 transition"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            &larr; 返回
+          </Link>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+            个人档案
+          </h1>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-purple-600 px-4 py-1.5 text-sm font-medium hover:bg-purple-500 transition"
+            className="rounded-lg px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 transition"
+            style={{ background: 'var(--gradient-primary)' }}
           >
             {showForm ? '取消' : '+ 新建'}
           </button>
         </div>
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="mb-8 rounded-2xl border p-6 backdrop-blur space-y-4"
+            style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}
+          >
             <div>
-              <label className="mb-1 block text-sm text-purple-300">姓名/备注</label>
+              <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>姓名/备注</label>
               <input
                 type="text" required
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/30 focus:border-purple-400 focus:outline-none"
+                className="w-full rounded-lg border px-3 py-2 placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none"
+                style={inputStyle}
                 placeholder="例：张三"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm text-purple-300">性别</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>性别</label>
                 <select
                   value={form.gender}
                   onChange={e => setForm({ ...form, gender: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 >
                   <option value="男">男</option>
                   <option value="女">女</option>
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-purple-300">出生城市</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>出生城市</label>
                 <div className="relative">
                   <input
                     type="text"
                     value={citySearch || form.city}
                     onChange={e => setCitySearch(e.target.value)}
                     onFocus={() => setCitySearch('')}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                    className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                    style={inputStyle}
                   />
                   {citySearch !== '' && (
-                    <div className="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-white/10 bg-gray-900">
+                    <div
+                      className="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border"
+                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}
+                    >
                       {cityResults.map(c => (
                         <button
                           key={c.name}
                           type="button"
                           onClick={() => { setForm({ ...form, city: c.name }); setCitySearch(''); }}
-                          className="block w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10"
+                          className="block w-full px-3 py-1.5 text-left text-sm hover:opacity-80"
+                          style={{ color: 'var(--text-primary)' }}
                         >
-                          {c.name} <span className="text-white/40">{c.province}</span>
+                          {c.name} <span style={{ color: 'var(--text-tertiary)' }}>{c.province}</span>
                         </button>
                       ))}
                     </div>
@@ -119,16 +145,18 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="mb-1 block text-sm text-purple-300">年</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>年</label>
                 <input type="number" min={1900} max={2030}
                   value={form.year} onChange={e => setForm({ ...form, year: +e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-purple-300">月</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>月</label>
                 <select value={form.month} onChange={e => setForm({ ...form, month: +e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 >
                   {Array.from({ length: 12 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>{i + 1}月</option>
@@ -136,9 +164,10 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-purple-300">日</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>日</label>
                 <select value={form.day} onChange={e => setForm({ ...form, day: +e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 >
                   {Array.from({ length: 31 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>{i + 1}日</option>
@@ -149,9 +178,10 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm text-purple-300">时</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>时</label>
                 <select value={form.hour} onChange={e => setForm({ ...form, hour: +e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>{String(i).padStart(2, '0')}时</option>
@@ -159,9 +189,10 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-purple-300">分</label>
+                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>分</label>
                 <select value={form.minute} onChange={e => setForm({ ...form, minute: +e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
+                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  style={inputStyle}
                 >
                   {Array.from({ length: 60 }, (_, i) => (
                     <option key={i} value={i}>{String(i).padStart(2, '0')}分</option>
@@ -172,7 +203,8 @@ export default function ProfilePage() {
 
             <button
               type="submit" disabled={loading}
-              className="w-full rounded-lg bg-purple-600 py-2.5 font-medium hover:bg-purple-500 transition disabled:opacity-50"
+              className="w-full rounded-lg py-2.5 font-medium text-white hover:opacity-90 transition disabled:opacity-50"
+              style={{ background: 'var(--gradient-primary)' }}
             >
               {loading ? '创建中...' : '创建档案'}
             </button>
@@ -180,7 +212,7 @@ export default function ProfilePage() {
         )}
 
         {profiles.length === 0 && !showForm && (
-          <div className="text-center py-16 text-purple-300/40">
+          <div className="text-center py-16" style={{ color: 'var(--text-tertiary)' }}>
             <p className="text-lg mb-2">还没有档案</p>
             <p className="text-sm">点击右上角「新建」开始</p>
           </div>
@@ -188,17 +220,22 @@ export default function ProfilePage() {
 
         <div className="space-y-3">
           {profiles.map(p => (
-            <div key={p.id} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+            <div
+              key={p.id}
+              className="rounded-2xl border p-5 backdrop-blur"
+              style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}
+            >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-lg font-medium text-purple-100">{p.name}</h3>
-                  <p className="mt-1 text-sm text-purple-300/60">
+                  <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>
                     {p.year}年{p.month}月{p.day}日 {String(p.hour).padStart(2, '0')}:{String(p.minute).padStart(2, '0')} · {p.city} · {p.gender}
                   </p>
                 </div>
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="text-xs text-red-400/60 hover:text-red-400"
+                  className="text-xs hover:opacity-80"
+                  style={{ color: 'var(--error)' }}
                 >
                   删除
                 </button>
@@ -206,13 +243,15 @@ export default function ProfilePage() {
               <div className="mt-3 flex gap-2">
                 <Link
                   href={`/chart?profileId=${p.id}`}
-                  className="rounded-lg bg-purple-600/30 px-3 py-1 text-sm text-purple-200 hover:bg-purple-600/50 transition"
+                  className="rounded-lg px-3 py-1 text-sm transition hover:opacity-80"
+                  style={{ background: 'var(--accent-primary-dim)', color: 'var(--text-primary)' }}
                 >
                   排盘分析
                 </Link>
                 <Link
                   href={`/chat?profileId=${p.id}`}
-                  className="rounded-lg bg-purple-600/30 px-3 py-1 text-sm text-purple-200 hover:bg-purple-600/50 transition"
+                  className="rounded-lg px-3 py-1 text-sm transition hover:opacity-80"
+                  style={{ background: 'var(--accent-primary-dim)', color: 'var(--text-primary)' }}
                 >
                   AI 对话
                 </Link>

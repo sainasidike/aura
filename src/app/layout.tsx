@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aura - AI 命理",
-  description: "AI 驱动的中国传统命理分析 — 八字、紫微斗数、西洋星盘",
+  title: "Aura — AI 命理顾问",
+  description: "融合中西命理的 AI 顾问。星盘、八字、紫微斗数，三大体系一站式解读。",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#f5f3fa",
 };
 
 export default function RootLayout({
@@ -12,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="h-full">
-      <body className="min-h-full bg-gradient-to-b from-indigo-950 via-purple-950 to-black text-white antialiased">
+    <html lang="zh-CN" className="h-full antialiased">
+      <body className="min-h-full flex flex-col bg-bg-deep text-text-primary font-body">
         {children}
       </body>
     </html>

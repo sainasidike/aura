@@ -21,7 +21,16 @@ const PRESET_QUESTIONS = [
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-purple-300/40">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          加载中...
+        </div>
+      }
+    >
       <ChatContent />
     </Suspense>
   );
@@ -157,8 +166,14 @@ function ChatContent() {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-purple-300/60 mb-4">请先选择一个档案</p>
-          <Link href="/profile" className="rounded-lg bg-purple-600 px-4 py-2 text-sm hover:bg-purple-500">
+          <p className="mb-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            请先选择一个档案
+          </p>
+          <Link
+            href="/profile"
+            className="rounded-lg px-4 py-2 text-sm text-white"
+            style={{ background: 'var(--accent-primary)' }}
+          >
             前往档案管理
           </Link>
         </div>
@@ -167,27 +182,54 @@ function ChatContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col" style={{ background: 'var(--bg-base)' }}>
       {/* Header */}
-      <div className="border-b border-white/10 bg-black/20 px-4 py-3 backdrop-blur">
+      <div
+        className="px-4 py-3"
+        style={{
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'rgba(248,247,252,0.85)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+        }}
+      >
         <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <Link href="/profile" className="text-purple-300/60 hover:text-purple-200 text-sm">&larr;</Link>
+          <Link
+            href="/profile"
+            className="text-sm"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            &larr;
+          </Link>
           <div className="text-center">
-            <p className="text-sm font-medium text-purple-100">AI 命理对话</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              AI 命理对话
+            </p>
             {profile && (
-              <p className="text-xs text-purple-300/50">{profile.name} · {profile.city}</p>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {profile.name} &middot; {profile.city}
+              </p>
             )}
           </div>
-          <Link href={`/chart?profileId=${profileId}`} className="text-purple-300/60 hover:text-purple-200 text-xs">排盘</Link>
+          <Link
+            href={`/chart?profileId=${profileId}`}
+            className="text-xs"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            排盘
+          </Link>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      {/* Messages — pb-24 leaves room for the fixed input bar + BottomNav */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 pb-40">
         <div className="mx-auto max-w-2xl space-y-4">
           {messages.length === 0 && (
             <div className="py-8">
-              <p className="mb-6 text-center text-purple-300/40 text-sm">
+              <p
+                className="mb-6 text-center text-sm"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
                 {chartData ? '排盘数据已就绪，选择一个问题开始对话' : '正在准备排盘数据...'}
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -196,7 +238,18 @@ function ChatContent() {
                     key={i}
                     onClick={() => sendMessage(q)}
                     disabled={streaming || !chartData}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-purple-200 hover:bg-white/10 transition disabled:opacity-30"
+                    className="rounded-xl px-4 py-3 text-left text-sm transition disabled:opacity-30"
+                    style={{
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-surface)';
+                    }}
                   >
                     {q}
                   </button>
@@ -207,11 +260,20 @@ function ChatContent() {
 
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white/10 text-purple-100'
-              }`}>
+              <div
+                className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                style={
+                  msg.role === 'user'
+                    ? {
+                        background: 'var(--gradient-primary)',
+                        color: '#ffffff',
+                      }
+                    : {
+                        background: 'var(--bg-surface)',
+                        color: 'var(--text-primary)',
+                      }
+                }
+              >
                 <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
               </div>
             </div>
@@ -220,8 +282,18 @@ function ChatContent() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-white/10 bg-black/20 px-4 py-3 backdrop-blur">
+      {/* Input — fixed above BottomNav (bottom ~56px + safe-area) */}
+      <div
+        className="fixed left-0 right-0 px-4 py-3"
+        style={{
+          bottom: 'calc(56px + env(safe-area-inset-bottom))',
+          borderTop: '1px solid var(--border-subtle)',
+          background: 'rgba(248,247,252,0.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 40,
+        }}
+      >
         <div className="mx-auto flex max-w-2xl gap-2">
           <input
             value={input}
@@ -229,12 +301,18 @@ function ChatContent() {
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
             placeholder="输入你的问题..."
             disabled={streaming}
-            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:border-purple-400 focus:outline-none disabled:opacity-50"
+            className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:outline-none disabled:opacity-50"
+            style={{
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-base)',
+              color: 'var(--text-primary)',
+            }}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={streaming || !input.trim()}
-            className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium hover:bg-purple-500 transition disabled:opacity-30"
+            className="rounded-xl px-5 py-2.5 text-sm font-medium text-white transition disabled:opacity-30"
+            style={{ background: 'var(--accent-primary)' }}
           >
             发送
           </button>

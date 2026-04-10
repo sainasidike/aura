@@ -109,13 +109,13 @@ function calculateFortuneScores(
     }
   }
 
-  // 分配相位到运势类别
-  const categoryMap: Record<string, string[]> = {
-    love: ['金星', '月亮', '火星'],
-    career: ['太阳', '土星', '木星', '火星'],
-    health: ['火星', '土星', '太阳', '月亮'],
-    study: ['水星', '木星', '天王星'],
-    social: ['金星', '木星', '月亮', '水星'],
+  // 每个类别只关联主星（第一个是主星，权重高；其余权重低）
+  const categoryPlanets: Record<string, { primary: string; secondary: string[] }> = {
+    love:   { primary: '金星', secondary: ['月亮'] },
+    career: { primary: '太阳', secondary: ['土星', '木星'] },
+    health: { primary: '火星', secondary: ['土星'] },
+    study:  { primary: '水星', secondary: ['木星'] },
+    social: { primary: '木星', secondary: ['金星', '月亮'] },
   };
 
   // 日主信息用于哈希种子
@@ -124,39 +124,55 @@ function calculateFortuneScores(
 
   const categories: ScoreResult['categories'] = {};
 
-  for (const [cat, planets] of Object.entries(categoryMap)) {
-    const relevant = transitAspects.filter(a =>
-      planets.some(p => a.transit.includes(p) || a.natal.includes(p))
+  for (const [cat, { primary, secondary }] of Object.entries(categoryPlanets)) {
+    // 只匹配行运主星的相位（更精准）
+    const primaryAspects = transitAspects.filter(a => a.transit.includes(primary));
+    const secondaryAspects = transitAspects.filter(a =>
+      secondary.some(p => a.transit.includes(p)) && !a.transit.includes(primary)
     );
 
-    // 确定性基础分：基于类别+日期+日柱哈希，产生 58-72 的基础分
-    const seed = `${cat}:${dateKey}:${dayGan}${dayZhi}:${period}`;
-    const baseHash = deterministicHash(seed);
-    let score = 58 + Math.floor(baseHash * 15); // 58-72
+    const relevant = [...primaryAspects, ...secondaryAspects].slice(0, 5);
 
-    // 相位影响：用 orb 的紧密度加权，orb 越小影响越大
-    for (const a of relevant) {
-      const weight = 1 - (a.orb / 6); // 0-1，越紧密越大
-      const impact = Math.round(3 + weight * 4); // 3-7
+    // 确定性基础分：每个类别用不同的哈希种子
+    const seed = `${cat}:${dateKey}:${dayGan}${dayZhi}:${period}:v2`;
+    const h1 = deterministicHash(seed);
+    const h2 = deterministicHash(seed + ':salt');
+    let score = 52 + Math.floor(h1 * 20); // 52-71
+
+    // 主星相位影响大（±5-8），副星影响小（±2-4）
+    for (const a of primaryAspects.slice(0, 3)) {
+      const weight = 1 - (a.orb / 6);
+      const impact = Math.round(5 + weight * 3);
       if (a.nature === '和谐') score += impact;
-      else if (a.nature === '融合') score += Math.round(impact * 0.7);
+      else if (a.nature === '融合') score += Math.round(impact * 0.6);
       else if (a.nature === '紧张') score -= impact;
-      else if (a.nature === '对立') score -= Math.round(impact * 0.8);
+      else if (a.nature === '对立') score -= Math.round(impact * 0.7);
     }
+    for (const a of secondaryAspects.slice(0, 2)) {
+      const weight = 1 - (a.orb / 6);
+      const impact = Math.round(2 + weight * 2);
+      if (a.nature === '和谐') score += impact;
+      else if (a.nature === '融合') score += Math.round(impact * 0.5);
+      else if (a.nature === '紧张') score -= impact;
+      else if (a.nature === '对立') score -= Math.round(impact * 0.6);
+    }
+
+    // 用第二个哈希给每个类别额外加减 ±5，确保差异
+    score += Math.floor(h2 * 11) - 5; // -5 到 +5
 
     // 八字日主五行与类别的亲和度
     const ganWuxing: Record<string, string> = { '甲': '木', '乙': '木', '丙': '火', '丁': '火', '戊': '土', '己': '土', '庚': '金', '辛': '金', '壬': '水', '癸': '水' };
     const wx = ganWuxing[dayGan] || '土';
     const wxBonus: Record<string, Record<string, number>> = {
-      love:   { '水': 4, '火': 3, '木': 1, '金': -1, '土': 0 },
-      career: { '金': 4, '木': 3, '土': 2, '火': 0, '水': -1 },
-      health: { '土': 3, '木': 2, '水': 1, '金': 0, '火': -2 },
-      study:  { '水': 4, '木': 3, '金': 1, '火': -1, '土': 0 },
-      social: { '火': 3, '土': 2, '水': 1, '木': 0, '金': -1 },
+      love:   { '水': 5, '火': 3, '木': 1, '金': -2, '土': -1 },
+      career: { '金': 5, '木': 3, '土': 2, '火': -1, '水': -2 },
+      health: { '土': 4, '木': 3, '水': 1, '金': -1, '火': -3 },
+      study:  { '水': 5, '木': 3, '金': 1, '火': -2, '土': -1 },
+      social: { '火': 4, '土': 3, '水': 1, '木': -1, '金': -2 },
     };
     score += wxBonus[cat]?.[wx] ?? 0;
 
-    // 按周期微调（周期越长越趋向均值）
+    // 按周期微调
     if (period === 'weekly') score = Math.round(score * 0.95 + 3);
     if (period === 'monthly') score = Math.round(score * 0.9 + 7);
     if (period === 'yearly') score = Math.round(score * 0.85 + 10);

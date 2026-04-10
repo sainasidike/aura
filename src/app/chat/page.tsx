@@ -3,13 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-
-interface Profile {
-  id: string; name: string; gender: string;
-  year: number; month: number; day: number;
-  hour: number; minute: number;
-  city: string; longitude: number; latitude: number; timezone: string;
-}
+import { getProfileById, type StoredProfile } from '@/lib/storage';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -37,7 +31,7 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const profileId = searchParams.get('profileId');
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [chartData, setChartData] = useState<Record<string, unknown> | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -46,21 +40,18 @@ function ChatContent() {
 
   useEffect(() => {
     if (!profileId) return;
-    fetch('/api/profiles').then(r => r.json()).then((profiles: Profile[]) => {
-      const p = profiles.find(p => p.id === profileId);
-      if (p) {
-        setProfile(p);
-        // 预先获取排盘数据
-        fetchChartData(p);
-      }
-    });
+    const p = getProfileById(profileId);
+    if (p) {
+      setProfile(p);
+      fetchChartData(p);
+    }
   }, [profileId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const fetchChartData = async (p: Profile) => {
+  const fetchChartData = async (p: StoredProfile) => {
     try {
       const [baziRes, ziweiRes] = await Promise.all([
         fetch('/api/bazi', {

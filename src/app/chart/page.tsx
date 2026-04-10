@@ -3,16 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { getProfileById, type StoredProfile } from '@/lib/storage';
 import type { BaziChart, ZiweiChart, TimeStandardization } from '@/types';
 
 type Tab = 'bazi' | 'ziwei';
-
-interface Profile {
-  id: string; name: string; gender: string;
-  year: number; month: number; day: number;
-  hour: number; minute: number;
-  city: string; longitude: number; latitude: number; timezone: string;
-}
 
 export default function ChartPage() {
   return (
@@ -26,7 +20,7 @@ function ChartContent() {
   const searchParams = useSearchParams();
   const profileId = searchParams.get('profileId');
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [tab, setTab] = useState<Tab>('bazi');
   const [baziData, setBaziData] = useState<{ timeInfo: TimeStandardization; chart: BaziChart } | null>(null);
   const [ziweiData, setZiweiData] = useState<{ timeInfo: TimeStandardization; chart: ZiweiChart } | null>(null);
@@ -35,10 +29,8 @@ function ChartContent() {
 
   useEffect(() => {
     if (!profileId) return;
-    fetch('/api/profiles').then(r => r.json()).then((profiles: Profile[]) => {
-      const p = profiles.find(p => p.id === profileId);
-      if (p) setProfile(p);
-    });
+    const p = getProfileById(profileId);
+    if (p) setProfile(p);
   }, [profileId]);
 
   const fetchChart = async (type: Tab) => {

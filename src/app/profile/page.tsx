@@ -3,25 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CITIES, searchCity } from '@/lib/cities';
-
-interface Profile {
-  id: string;
-  name: string;
-  gender: string;
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  city: string;
-  longitude: number;
-  latitude: number;
-  timezone: string;
-  isDefault: boolean;
-}
+import { getProfiles, addProfile, deleteProfile, type StoredProfile } from '@/lib/storage';
 
 export default function ProfilePage() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [profiles, setProfiles] = useState<StoredProfile[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '', gender: '男',
@@ -33,7 +18,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/profiles').then(r => r.json()).then(setProfiles);
+    setProfiles(getProfiles());
   }, []);
 
   useEffect(() => {
@@ -44,31 +29,24 @@ export default function ProfilePage() {
     }
   }, [citySearch]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const cityData = CITIES.find(c => c.name === form.city);
-    const res = await fetch('/api/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        longitude: cityData?.longitude ?? 116.40,
-        latitude: cityData?.latitude ?? 39.90,
-        timezone: cityData?.timezone ?? 'Asia/Shanghai',
-      }),
+    const profile = addProfile({
+      ...form,
+      longitude: cityData?.longitude ?? 116.40,
+      latitude: cityData?.latitude ?? 39.90,
+      timezone: cityData?.timezone ?? 'Asia/Shanghai',
     });
-    if (res.ok) {
-      const profile = await res.json();
-      setProfiles(prev => [profile, ...prev]);
-      setShowForm(false);
-      setForm({ name: '', gender: '男', year: 1990, month: 1, day: 1, hour: 12, minute: 0, city: '北京' });
-    }
+    setProfiles(prev => [profile, ...prev]);
+    setShowForm(false);
+    setForm({ name: '', gender: '男', year: 1990, month: 1, day: 1, hour: 12, minute: 0, city: '北京' });
     setLoading(false);
   };
 
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+  const handleDelete = (id: string) => {
+    deleteProfile(id);
     setProfiles(prev => prev.filter(p => p.id !== id));
   };
 
@@ -117,7 +95,7 @@ export default function ProfilePage() {
                   <input
                     type="text"
                     value={citySearch || form.city}
-                    onChange={e => { setCitySearch(e.target.value); }}
+                    onChange={e => setCitySearch(e.target.value)}
                     onFocus={() => setCitySearch('')}
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-purple-400 focus:outline-none"
                   />

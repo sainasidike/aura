@@ -9,9 +9,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messages, chartData } = body as {
+    const { messages, chartData, mode } = body as {
       messages: ZhipuMessage[];
       chartData?: Record<string, unknown>;
+      mode?: string;
     };
 
     if (!messages || !Array.isArray(messages)) {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (chartData) {
       fullMessages.push({
         role: 'system',
-        content: buildSystemPrompt(chartData),
+        content: buildSystemPrompt(chartData, mode),
       });
     }
 

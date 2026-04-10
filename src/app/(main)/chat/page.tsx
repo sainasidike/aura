@@ -146,6 +146,7 @@ function ChatContent() {
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
           chartData: getChartDataForMode(),
+          mode,
         }),
       });
 

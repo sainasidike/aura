@@ -1,18 +1,3 @@
-// ========== 基础类型 ==========
-
-export interface BirthInfo {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  gender: '男' | '女';
-  city: string;
-  longitude: number;
-  latitude: number;
-  timezone: string; // IANA timezone string, e.g. 'Asia/Shanghai'
-}
-
 // ========== 时间标准化 ==========
 
 export interface TimeStandardization {

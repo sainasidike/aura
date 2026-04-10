@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       chart,
       meta: {
         engine: 'astronomy-engine',
-        houseSystem: 'Equal',
+        houseSystem: 'Placidus',
         trueSolarTimeApplied: true,
       },
     });

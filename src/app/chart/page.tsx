@@ -4,9 +4,9 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, type StoredProfile } from '@/lib/storage';
-import type { BaziChart, ZiweiChart, TimeStandardization } from '@/types';
+import type { BaziChart, ZiweiChart, AstrologyChart, TimeStandardization } from '@/types';
 
-type Tab = 'bazi' | 'ziwei';
+type Tab = 'bazi' | 'ziwei' | 'astrology';
 
 export default function ChartPage() {
   return (
@@ -24,6 +24,7 @@ function ChartContent() {
   const [tab, setTab] = useState<Tab>('bazi');
   const [baziData, setBaziData] = useState<{ timeInfo: TimeStandardization; chart: BaziChart } | null>(null);
   const [ziweiData, setZiweiData] = useState<{ timeInfo: TimeStandardization; chart: ZiweiChart } | null>(null);
+  const [astroData, setAstroData] = useState<{ timeInfo: TimeStandardization; chart: AstrologyChart } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,13 +47,15 @@ function ChartContent() {
           hour: profile.hour, minute: profile.minute,
           gender: profile.gender,
           longitude: profile.longitude,
+          latitude: profile.latitude,
           timezone: profile.timezone,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       if (type === 'bazi') setBaziData(data);
-      else setZiweiData(data);
+      else if (type === 'ziwei') setZiweiData(data);
+      else setAstroData(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : '计算失败');
     }
@@ -91,7 +94,7 @@ function ChartContent() {
 
         {/* Tab 切换 */}
         <div className="mb-6 flex gap-2">
-          {(['bazi', 'ziwei'] as Tab[]).map(t => (
+          {([['bazi', '八字四柱'], ['ziwei', '紫微斗数'], ['astrology', '西洋星盘']] as [Tab, string][]).map(([t, label]) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -101,7 +104,7 @@ function ChartContent() {
                   : 'bg-white/5 text-purple-300/60 hover:bg-white/10'
               }`}
             >
-              {t === 'bazi' ? '八字四柱' : '紫微斗数'}
+              {label}
             </button>
           ))}
         </div>
@@ -117,6 +120,11 @@ function ChartContent() {
         {/* 紫微展示 */}
         {tab === 'ziwei' && ziweiData && !loading && (
           <ZiweiDisplay data={ziweiData} />
+        )}
+
+        {/* 星盘展示 */}
+        {tab === 'astrology' && astroData && !loading && (
+          <AstrologyDisplay data={astroData} />
         )}
       </div>
     </div>
@@ -296,6 +304,73 @@ function ZiweiDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: 
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AstrologyDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: AstrologyChart } }) {
+  const { chart } = data;
+  const SIGNS = ['白羊','金牛','双子','巨蟹','狮子','处女','天秤','天蝎','射手','摩羯','水瓶','双鱼'];
+  const ascSign = SIGNS[Math.floor(chart.ascendant / 30)];
+  const ascDeg = Math.floor(chart.ascendant % 30);
+
+  return (
+    <div className="space-y-6">
+      {/* 上升点 */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
+        <span className="text-purple-300/80">
+          上升星座: <strong className="text-purple-100">{ascSign} {ascDeg}°</strong>
+        </span>
+      </div>
+
+      {/* 行星表格 */}
+      <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-purple-300/60">
+              <th className="px-4 py-2.5 text-left font-medium">行星</th>
+              <th className="px-4 py-2.5 text-left font-medium">星座</th>
+              <th className="px-4 py-2.5 text-left font-medium">度数</th>
+              <th className="px-4 py-2.5 text-left font-medium">宫位</th>
+            </tr>
+          </thead>
+          <tbody className="text-purple-100">
+            {chart.planets.map((p, i) => (
+              <tr key={i} className="border-b border-white/5">
+                <td className="px-4 py-2">
+                  {p.name}
+                  {p.retrograde && <span className="ml-1 text-xs text-red-400">R</span>}
+                </td>
+                <td className="px-4 py-2">{p.sign}</td>
+                <td className="px-4 py-2 text-purple-300/70">{p.degree}°{p.minute}&apos;</td>
+                <td className="px-4 py-2 text-purple-300/70">第{p.house}宫</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 相位 */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <p className="mb-3 text-sm text-purple-300/60">主要相位</p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {chart.aspects.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span className="text-purple-100">{a.planet1}</span>
+              <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                a.type === '合相' ? 'bg-blue-500/20 text-blue-300' :
+                a.type === '三合' || a.type === '六合' ? 'bg-green-500/20 text-green-300' :
+                a.type === '四分' || a.type === '对冲' ? 'bg-red-500/20 text-red-300' :
+                'bg-white/10 text-white/60'
+              }`}>
+                {a.type}
+              </span>
+              <span className="text-purple-100">{a.planet2}</span>
+              <span className="text-xs text-purple-300/40">{a.orb}°</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

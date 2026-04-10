@@ -7,7 +7,7 @@ import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
 import type { BaziChart, ZiweiChart, AstrologyChart, TimeStandardization, PlanetPosition, HousePosition, Aspect } from '@/types';
 
 type Tab = 'bazi' | 'ziwei' | 'astrology';
-type AstroSubTab = 'chart' | 'params' | 'aspects';
+// removed AstroSubTab — all sections shown inline
 
 export default function ChartPage() {
   return (
@@ -112,7 +112,6 @@ function ChartContent() {
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [tab, setTab] = useState<Tab>('astrology');
-  const [astroSubTab, setAstroSubTab] = useState<AstroSubTab>('chart');
   const [baziData, setBaziData] = useState<{ timeInfo: TimeStandardization; chart: BaziChart } | null>(null);
   const [ziweiData, setZiweiData] = useState<{ timeInfo: TimeStandardization; chart: ZiweiChart } | null>(null);
   const [astroData, setAstroData] = useState<{ timeInfo: TimeStandardization; chart: AstrologyChart } | null>(null);
@@ -205,25 +204,6 @@ function ChartContent() {
           ))}
         </div>
 
-        {/* Astrology Sub-tabs */}
-        {tab === 'astrology' && (
-          <div className="mb-4 flex gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-            {([['chart', '星盘图表'], ['params', '常用参数'], ['aspects', '相位表']] as [AstroSubTab, string][]).map(([st, label]) => (
-              <button
-                key={st}
-                onClick={() => setAstroSubTab(st)}
-                className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition"
-                style={astroSubTab === st
-                  ? { background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }
-                  : { background: 'var(--bg-surface)', color: 'var(--text-tertiary)', border: '1px solid transparent' }
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {loading && <div className="text-center py-12" style={{ color: 'var(--text-tertiary)' }}>计算中...</div>}
         {error && <div className="text-center py-12" style={{ color: 'var(--error)' }}>{error}</div>}
 
@@ -233,13 +213,13 @@ function ChartContent() {
         {/* Ziwei */}
         {tab === 'ziwei' && ziweiData && !loading && <ZiweiDisplay data={ziweiData} />}
 
-        {/* Astrology */}
+        {/* Astrology — chart + params + aspects all inline */}
         {tab === 'astrology' && astroData && !loading && (
-          <>
-            {astroSubTab === 'chart' && <NatalChartSVG chart={astroData.chart} />}
-            {astroSubTab === 'params' && <ParamsDisplay chart={astroData.chart} />}
-            {astroSubTab === 'aspects' && <AspectGrid chart={astroData.chart} />}
-          </>
+          <div className="space-y-6">
+            <NatalChartSVG chart={astroData.chart} />
+            <ParamsDisplay chart={astroData.chart} />
+            <AspectGrid chart={astroData.chart} />
+          </div>
         )}
       </div>
     </div>

@@ -56,8 +56,9 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const profileIdRef = useRef<string | null>(null);
 
-  const chatStorageKey = (id: string) => `aura_chat_${id}`;
+  const chatStorageKey = (id: string, m: ChartMode) => `aura_chat_${id}_${m}`;
 
+  // Load profile
   useEffect(() => {
     let p: StoredProfile | undefined;
     if (paramProfileId) {
@@ -71,21 +72,29 @@ function ChatContent() {
       setProfile(p);
       profileIdRef.current = p.id;
       fetchAllChartData(p);
-      try {
-        const saved = localStorage.getItem(chatStorageKey(p.id));
-        if (saved) setMessages(JSON.parse(saved));
-      } catch { /* ignore */ }
     }
   }, [paramProfileId]);
 
+  // Restore conversation when profile or mode changes
+  useEffect(() => {
+    if (!profileIdRef.current) return;
+    try {
+      const saved = localStorage.getItem(chatStorageKey(profileIdRef.current, mode));
+      setMessages(saved ? JSON.parse(saved) : []);
+    } catch {
+      setMessages([]);
+    }
+  }, [mode, profile]);
+
+  // Save conversation & scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     if (!streaming && messages.length > 0 && profileIdRef.current) {
       try {
-        localStorage.setItem(chatStorageKey(profileIdRef.current), JSON.stringify(messages));
+        localStorage.setItem(chatStorageKey(profileIdRef.current, mode), JSON.stringify(messages));
       } catch { /* ignore */ }
     }
-  }, [messages, streaming]);
+  }, [messages, streaming, mode]);
 
   const fetchAllChartData = async (p: StoredProfile) => {
     try {

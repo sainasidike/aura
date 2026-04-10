@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 const tabs = [
   { path: "/fortune", icon: "☽", label: "运势" },
   { path: "/chat", icon: "✦", label: "AI 占星师", isCenter: true },
-  { path: "/chart", icon: "◇", label: "排盘" },
+  { path: "/chart", icon: "◇", label: "工具" },
 ];
 
 export default function BottomNav() {

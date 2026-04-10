@@ -172,19 +172,19 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
               <td className="p-1">{chart.shiShen.tianGan.day}</td>
               <td className="p-1">{chart.shiShen.tianGan.time}</td>
             </tr>
-            <tr className="text-2xl font-bold">
-              <td className="p-2 text-right text-sm font-normal text-purple-300/40">天干</td>
-              <td className="p-2">{p.year.gan}</td>
-              <td className="p-2">{p.month.gan}</td>
-              <td className="p-2 text-amber-300">{p.day.gan}</td>
-              <td className="p-2">{p.time.gan}</td>
+            <tr className="text-xl sm:text-2xl font-bold">
+              <td className="p-1.5 sm:p-2 text-right text-sm font-normal text-purple-300/40">天干</td>
+              <td className="p-1.5 sm:p-2">{p.year.gan}</td>
+              <td className="p-1.5 sm:p-2">{p.month.gan}</td>
+              <td className="p-1.5 sm:p-2 text-amber-300">{p.day.gan}</td>
+              <td className="p-1.5 sm:p-2">{p.time.gan}</td>
             </tr>
-            <tr className="text-2xl font-bold">
-              <td className="p-2 text-right text-sm font-normal text-purple-300/40">地支</td>
-              <td className="p-2">{p.year.zhi}</td>
-              <td className="p-2">{p.month.zhi}</td>
-              <td className="p-2">{p.day.zhi}</td>
-              <td className="p-2">{p.time.zhi}</td>
+            <tr className="text-xl sm:text-2xl font-bold">
+              <td className="p-1.5 sm:p-2 text-right text-sm font-normal text-purple-300/40">地支</td>
+              <td className="p-1.5 sm:p-2">{p.year.zhi}</td>
+              <td className="p-1.5 sm:p-2">{p.month.zhi}</td>
+              <td className="p-1.5 sm:p-2">{p.day.zhi}</td>
+              <td className="p-1.5 sm:p-2">{p.time.zhi}</td>
             </tr>
             <tr className="text-xs text-purple-400/60">
               <td className="p-1 text-right text-purple-300/40">藏干</td>
@@ -227,12 +227,12 @@ function BaziDisplay({ data }: { data: { timeInfo: TimeStandardization; chart: B
       {/* 大运 */}
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
         <p className="mb-3 text-sm text-purple-300/60">大运</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-2">
           {chart.dayun.map((d, i) => (
-            <div key={i} className="rounded-lg bg-white/5 px-3 py-1.5 text-center">
+            <div key={i} className="rounded-lg bg-white/5 px-2 py-1.5 text-center">
               <p className="text-xs text-purple-300/50">{d.startAge}岁</p>
               <p className="font-medium text-purple-100">{d.ganZhi}</p>
-              <p className="text-xs text-purple-300/40">{d.startYear}-{d.endYear}</p>
+              <p className="text-xs text-purple-300/40">{d.startYear}</p>
             </div>
           ))}
         </div>

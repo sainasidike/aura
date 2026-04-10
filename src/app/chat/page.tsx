@@ -53,34 +53,27 @@ function ChatContent() {
 
   const fetchChartData = async (p: StoredProfile) => {
     try {
-      const [baziRes, ziweiRes] = await Promise.all([
-        fetch('/api/bazi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: p.year, month: p.month, day: p.day,
-            hour: p.hour, minute: p.minute,
-            gender: p.gender, longitude: p.longitude, timezone: p.timezone,
-          }),
-        }),
-        fetch('/api/ziwei', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: p.year, month: p.month, day: p.day,
-            hour: p.hour, minute: p.minute,
-            gender: p.gender, longitude: p.longitude, timezone: p.timezone,
-          }),
-        }),
+      const body = {
+        year: p.year, month: p.month, day: p.day,
+        hour: p.hour, minute: p.minute,
+        gender: p.gender, longitude: p.longitude,
+        latitude: p.latitude, timezone: p.timezone,
+      };
+      const [baziRes, ziweiRes, astroRes] = await Promise.all([
+        fetch('/api/bazi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+        fetch('/api/ziwei', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+        fetch('/api/astrology', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
       ]);
 
       const bazi = await baziRes.json();
       const ziwei = await ziweiRes.json();
+      const astro = await astroRes.json();
 
       setChartData({
         profile: { name: p.name, gender: p.gender, birthDate: `${p.year}-${p.month}-${p.day}`, birthTime: `${p.hour}:${p.minute}`, city: p.city },
         bazi: bazi.chart,
         ziwei: ziwei.chart,
+        astrology: astro.chart,
         timeInfo: bazi.timeInfo,
       });
     } catch {

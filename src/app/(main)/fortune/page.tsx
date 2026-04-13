@@ -25,8 +25,24 @@ const CATEGORIES = [
 interface FortuneData {
   date: string;
   period: string;
+  chartType?: 'transit' | 'solar_return' | 'lunar_return';
   overall_score: number;
   categories: Record<string, { score: number; aspects: { transit: string; natal: string; type: string; nature: string; orb: number }[] }>;
+}
+
+/** 根据周期生成缓存粒度 key */
+function periodCacheKey(period: string, dateStr: string): string {
+  const d = new Date(dateStr);
+  switch (period) {
+    case 'weekly': {
+      const jan1 = new Date(d.getFullYear(), 0, 1);
+      const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+      return `${d.getFullYear()}-W${week}`;
+    }
+    case 'monthly': return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    case 'yearly': return `${d.getFullYear()}`;
+    default: return dateStr; // daily
+  }
 }
 
 const NATURE_STYLE: Record<string, { bg: string; text: string }> = {
@@ -128,7 +144,8 @@ export default function FortunePage() {
 
   const fetchFortune = useCallback(async () => {
     if (!activePerson) return;
-    const cacheKey = `fortune_${activePerson.id}_${period}_${dateStr}`;
+    const pck = periodCacheKey(period, dateStr);
+    const cacheKey = `fortune_${activePerson.id}_${period}_${pck}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) { setFortune(JSON.parse(cached)); return; }
 
@@ -159,7 +176,8 @@ export default function FortunePage() {
   // AI 解读
   useEffect(() => {
     if (!fortune || !activePerson) return;
-    const interpKey = `interp_${activePerson.id}_${period}_${dateStr}`;
+    const pck = periodCacheKey(period, dateStr);
+    const interpKey = `interp_${activePerson.id}_${period}_${pck}`;
     const cached = localStorage.getItem(interpKey);
     if (cached) {
       try { setInterpretations(JSON.parse(cached)); setInterpretDone(true); return; } catch { /* ignore */ }
@@ -440,7 +458,9 @@ export default function FortunePage() {
 
                 {data.aspects && data.aspects.length > 0 && (
                   <div className="px-4 pt-3">
-                    <div className="mb-2 text-[0.65rem] font-semibold tracking-wide" style={{ color: "var(--text-tertiary)" }}>行运相位影响</div>
+                    <div className="mb-2 text-[0.65rem] font-semibold tracking-wide" style={{ color: "var(--text-tertiary)" }}>
+                      {fortune.chartType === 'solar_return' ? '日返盘相位' : fortune.chartType === 'lunar_return' ? '月返盘相位' : '行运相位影响'}
+                    </div>
                     <div className="flex flex-wrap gap-1.5">
                       {data.aspects.map((asp, i) => {
                         const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.08)", text: "#888" };

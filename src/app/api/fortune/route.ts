@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
 import { standardizeTime } from '@/lib/time/solar-time';
 import { calculateBazi } from '@/lib/engines/bazi';
-import { calculateAstrology } from '@/lib/engines/astrology';
+import { calculateAstrology, findSolarReturn, findLunarReturn } from '@/lib/engines/astrology';
 
 /**
  * 运势评分 API
- * 基于八字大运流年 + 星盘行运相位，计算日/周/月/年运势分数
+ * 日运/周运 → 行运盘；月运 → 月返盘；年运 → 日返盘
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,29 +22,54 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: '缺少必要参数' }, { status: 400 });
     }
 
+    const lat = latitude ?? 39.9;
+
     // 计算命盘
     const timeInfo = await standardizeTime(year, month, day, hour, minute, longitude, timezone);
     const baziChart = calculateBazi(timeInfo, year, month, day, gender);
+    const natalChart = calculateAstrology(timeInfo, lat, longitude);
 
-    // 计算当前星盘（行运盘）
     const now = targetDate ? new Date(targetDate) : new Date();
-    const nowYear = now.getFullYear();
-    const nowMonth = now.getMonth() + 1;
-    const nowDay = now.getDate();
-    const nowHour = now.getHours();
-    const nowMinute = now.getMinutes();
-
-    const transitTimeInfo = await standardizeTime(nowYear, nowMonth, nowDay, nowHour, nowMinute, longitude, timezone);
-    const natalChart = calculateAstrology(timeInfo, latitude ?? 39.9, longitude);
-    const transitChart = calculateAstrology(transitTimeInfo, latitude ?? 39.9, longitude);
-
-    // 基于八字和星盘计算运势分数
     const dateKey = now.toISOString().slice(0, 10);
-    const scores = calculateFortuneScores(baziChart, natalChart, transitChart, period, dateKey);
+
+    // 根据周期选择对应的盘
+    let comparisonChart;
+    let chartType: 'transit' | 'solar_return' | 'lunar_return' = 'transit';
+
+    if (period === 'yearly') {
+      // 年运 → 日返盘 (Solar Return)
+      chartType = 'solar_return';
+      const natalSun = natalChart.planets.find(p => p.name === '太阳');
+      if (!natalSun) throw new Error('无法获取本命太阳位置');
+      const result = findSolarReturn(natalSun.longitude, now.getFullYear(), lat, longitude);
+      comparisonChart = result.chart;
+    } else if (period === 'monthly') {
+      // 月运 → 月返盘 (Lunar Return)
+      chartType = 'lunar_return';
+      const natalMoon = natalChart.planets.find(p => p.name === '月亮');
+      if (!natalMoon) throw new Error('无法获取本命月亮位置');
+      // 从当月1号开始搜索月返
+      const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+      const result = findLunarReturn(natalMoon.longitude, monthStart, lat, longitude);
+      comparisonChart = result.chart;
+    } else {
+      // 日运/周运 → 行运盘 (Transit)
+      chartType = 'transit';
+      const nowYear = now.getFullYear();
+      const nowMonth = now.getMonth() + 1;
+      const nowDay = now.getDate();
+      const nowHour = now.getHours();
+      const nowMinute = now.getMinutes();
+      const transitTimeInfo = await standardizeTime(nowYear, nowMonth, nowDay, nowHour, nowMinute, longitude, timezone);
+      comparisonChart = calculateAstrology(transitTimeInfo, lat, longitude);
+    }
+
+    const scores = calculateFortuneScores(baziChart, natalChart, comparisonChart, period, dateKey, chartType);
 
     return Response.json({
-      date: now.toISOString().slice(0, 10),
+      date: dateKey,
       period,
+      chartType,
       overall_score: scores.overall,
       categories: scores.categories,
     });
@@ -73,11 +98,16 @@ function deterministicHash(str: string): number {
 function calculateFortuneScores(
   bazi: ReturnType<typeof calculateBazi>,
   natal: ReturnType<typeof calculateAstrology>,
-  transit: ReturnType<typeof calculateAstrology>,
+  comparison: ReturnType<typeof calculateAstrology>,
   period: string,
   dateKey: string,
+  chartType: 'transit' | 'solar_return' | 'lunar_return' = 'transit',
 ): ScoreResult {
-  // 计算行运相位：transit planets vs natal planets
+  // 根据盘类型设置标签前缀
+  const prefixMap = { transit: '行运', solar_return: '日返', lunar_return: '月返' };
+  const prefix = prefixMap[chartType];
+
+  // 计算相位：comparison chart planets vs natal planets
   const transitAspects: { transit: string; natal: string; type: string; nature: string; orb: number }[] = [];
 
   const ASPECT_TYPES = [
@@ -88,7 +118,7 @@ function calculateFortuneScores(
     { name: '冲', angle: 180, orb: 6, nature: '对立' },
   ];
 
-  for (const tp of transit.planets) {
+  for (const tp of comparison.planets) {
     for (const np of natal.planets) {
       let diff = Math.abs(tp.longitude - np.longitude);
       if (diff > 180) diff = 360 - diff;
@@ -97,7 +127,7 @@ function calculateFortuneScores(
         const orb = Math.abs(diff - asp.angle);
         if (orb <= asp.orb) {
           transitAspects.push({
-            transit: `行运${tp.name}`,
+            transit: `${prefix}${tp.name}`,
             natal: `本命${np.name}`,
             type: asp.name,
             nature: asp.nature,

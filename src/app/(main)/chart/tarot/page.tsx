@@ -74,8 +74,14 @@ export default function TarotPage() {
   const [readingLoading, setReadingLoading] = useState(false);
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
   const [flipping, setFlipping] = useState(false);
+  // 追问对话
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
 
   const readingRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll reading
   useEffect(() => {
@@ -230,6 +236,96 @@ export default function TarotPage() {
     setReadingLoading(false);
   };
 
+  // 滚动到对话底部
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, chatLoading]);
+
+  // 从 AI 回复中提取推荐追问
+  const extractSuggestions = (text: string): { cleaned: string; questions: string[] } => {
+    const match = text.match(/\[推荐追问\]\s*\n?([\s\S]*?)$/);
+    if (!match) return { cleaned: text, questions: [] };
+    const cleaned = text.slice(0, match.index).trimEnd();
+    const questions = match[1]
+      .split('\n')
+      .map(l => l.replace(/^\d+\.\s*/, '').trim())
+      .filter(l => l.length > 0);
+    return { cleaned, questions };
+  };
+
+  // 发送追问
+  const sendChatMessage = async (msg?: string) => {
+    const text = msg || chatInput.trim();
+    if (!text || chatLoading || !reading) return;
+    setChatInput('');
+    setSuggestedQuestions([]);
+
+    const newMessages = [...chatMessages, { role: 'user' as const, content: text }];
+    setChatMessages(newMessages);
+    setChatLoading(true);
+
+    let assistantContent = '';
+    try {
+      const res = await fetch('/api/tarot/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          readingContent: reading,
+          cardsData: drawnCards.map(d => ({
+            name: d.card.name,
+            position: d.position,
+            isReversed: d.isReversed,
+          })),
+          question,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || '回答失败');
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No stream');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.content) {
+              assistantContent += parsed.content;
+              setChatMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      const { cleaned, questions } = extractSuggestions(assistantContent);
+      if (questions.length > 0) {
+        setChatMessages([...newMessages, { role: 'assistant', content: cleaned }]);
+        setSuggestedQuestions(questions);
+      }
+    } catch (e) {
+      setChatMessages([...newMessages, { role: 'assistant', content: `抱歉，${e instanceof Error ? e.message : '回答失败'}` }]);
+    }
+    setChatLoading(false);
+  };
+
   // ─── Reset ───
   const handleReset = () => {
     setStep('question');
@@ -244,6 +340,10 @@ export default function TarotPage() {
     setReadingLoading(false);
     setExpandedCard(null);
     setFlipping(false);
+    setChatMessages([]);
+    setChatInput('');
+    setChatLoading(false);
+    setSuggestedQuestions([]);
   };
 
   // ═══ RENDER ═══
@@ -700,6 +800,99 @@ export default function TarotPage() {
               )}
             </div>
 
+            {/* Follow-up Chat Section */}
+            {!readingLoading && reading && (
+              <div className="mt-6 animate-fadeIn">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-sm" style={{ color: '#9b8ed8' }}>✦</span>
+                  <span className="text-sm font-semibold" style={{ color: 'rgba(220,200,255,0.9)' }}>对解读有疑问？追问塔罗师</span>
+                </div>
+
+                {/* Default suggested questions */}
+                {chatMessages.length === 0 && suggestedQuestions.length === 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {[
+                      '这些牌之间有什么隐藏的联系？',
+                      '逆位的牌需要特别注意什么？',
+                      '未来一个月我应该怎么做？',
+                    ].map(q => (
+                      <button key={q} onClick={() => sendChatMessage(q)}
+                        className="rounded-full px-3 py-1.5 text-xs transition active:scale-95"
+                        style={{ background: 'rgba(123,108,184,0.12)', color: 'rgba(200,180,255,0.7)', border: '1px solid rgba(180,160,240,0.12)' }}>
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Chat messages */}
+                {chatMessages.length > 0 && (
+                  <div className="space-y-3 mb-3">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm"
+                          style={msg.role === 'user'
+                            ? { background: 'linear-gradient(135deg, #7b6cb8, #9b8ed8)', color: '#fff', borderBottomRightRadius: '4px' }
+                            : { background: 'rgba(255,255,255,0.04)', color: 'rgba(220,200,255,0.75)', border: '1px solid rgba(180,160,240,0.12)', borderBottomLeftRadius: '4px' }
+                          }
+                        >
+                          {msg.role === 'assistant'
+                            ? <div className="prose-chat tarot-prose" dangerouslySetInnerHTML={{ __html: simpleMarkdownTarot(msg.content) }} />
+                            : msg.content
+                          }
+                        </div>
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div className="flex justify-start">
+                        <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(180,160,240,0.12)' }}>
+                          <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: '#9b8ed8' }} />
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+
+                {/* AI suggested follow-up */}
+                {suggestedQuestions.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {suggestedQuestions.map(q => (
+                      <button key={q} onClick={() => sendChatMessage(q)}
+                        className="rounded-full px-3 py-1.5 text-xs transition active:scale-95"
+                        style={{ background: 'rgba(123,108,184,0.12)', color: 'rgba(200,180,255,0.7)', border: '1px solid rgba(180,160,240,0.12)' }}>
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Input */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && sendChatMessage()}
+                    placeholder="输入你的问题..."
+                    disabled={chatLoading}
+                    className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition disabled:opacity-50"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: '#e8e0f8', border: '1px solid rgba(180,160,240,0.15)' }}
+                  />
+                  <button
+                    onClick={() => sendChatMessage()}
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
+                    style={{ background: 'linear-gradient(135deg, #7b6cb8, #9b8ed8)', color: '#fff' }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Actions after reading */}
             {!readingLoading && reading && (
               <div className="mt-4 flex gap-3 animate-fadeIn">
@@ -732,4 +925,20 @@ export default function TarotPage() {
       `}</style>
     </div>
   );
+}
+
+/** Minimal markdown to HTML for chat bubbles */
+function simpleMarkdownTarot(text: string): string {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^/, '<p>').replace(/$/, '</p>');
 }

@@ -13,20 +13,19 @@ interface Message {
 
 type ChartMode = 'astrology' | 'bazi' | 'ziwei' | 'mixed';
 
+const MODE_ORDER: ChartMode[] = ['mixed', 'astrology', 'bazi', 'ziwei'];
 const MODE_LABELS: Record<ChartMode, string> = {
+  mixed: '综合',
   astrology: '星盘',
   bazi: '八字',
   ziwei: '紫微',
-  mixed: '混合',
 };
 
-const PRESET_QUESTIONS = [
-  '请帮我全面分析一下我的命盘',
-  '我的事业运势如何？',
-  '我的感情婚姻方面有什么特点？',
-  '我今年的运势怎么样？',
-  '我的财运如何？适合什么方式理财？',
-  '我的性格有什么优缺点？',
+const QUICK_TOPICS = [
+  { label: '今日运势', color: '#5bc084', question: '请帮我分析一下我今天的运势如何？' },
+  { label: '情感分析', color: '#d07090', question: '请帮我分析一下我的感情婚姻方面有什么特点？' },
+  { label: '事业指引', color: '#e0a040', question: '请帮我分析一下我的事业运势和职业方向' },
+  { label: '流年运势', color: '#8868b0', question: '请帮我分析一下我今年的流年运势' },
 ];
 
 export default function ChatPage() {
@@ -52,7 +51,7 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [mode, setMode] = useState<ChartMode>('astrology');
+  const [mode, setMode] = useState<ChartMode>('mixed');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const profileIdRef = useRef<string | null>(null);
@@ -255,70 +254,65 @@ function ChatContent() {
 
   return (
     <div className="flex min-h-screen flex-col" style={{ background: 'var(--bg-base)' }}>
-      {/* Header */}
+      {/* Fixed Header */}
       <div
-        className="px-4 py-3"
+        className="fixed left-0 right-0 top-0 px-4 pb-3 pt-3"
         style={{
-          borderBottom: '1px solid var(--border-subtle)',
-          background: 'rgba(248,247,252,0.85)',
+          background: 'rgba(248,247,252,0.92)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
+          zIndex: 50,
         }}
       >
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <Link href="/fortune" className="text-sm" style={{ color: 'var(--text-tertiary)' }}>&larr;</Link>
-          <div className="text-center">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>AI 命理对话</p>
-            {profile && (
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {profile.name} &middot; {profile.city}
-              </p>
-            )}
-          </div>
-          <Link href="/chart" className="text-xs" style={{ color: 'var(--text-tertiary)' }}>工具</Link>
-        </div>
+        <div className="mx-auto max-w-2xl">
+          {/* Title */}
+          <p className="text-lg font-semibold" style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-display)' }}>
+            ✦ AI 占星师
+          </p>
 
-        {/* Mode selector — subtle row below header text */}
-        <div className="mx-auto mt-2 flex max-w-2xl items-center justify-center gap-1">
-          {(Object.keys(MODE_LABELS) as ChartMode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className="rounded-full px-2.5 py-0.5 text-[0.65rem] transition"
-              style={mode === m
-                ? { background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)', fontWeight: 500 }
-                : { color: 'var(--text-tertiary)' }
-              }
-            >
-              {MODE_LABELS[m]}
-            </button>
-          ))}
+          {/* Mode selector */}
+          <div className="mt-2 flex items-center gap-1">
+            {MODE_ORDER.map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className="rounded-full px-3 py-1 text-xs transition"
+                style={mode === m
+                  ? { background: 'var(--accent-primary)', color: '#fff', fontWeight: 500 }
+                  : { color: 'var(--text-tertiary)' }
+                }
+              >
+                {MODE_LABELS[m]}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick topic buttons */}
+          <div className="mt-2.5 flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+            {QUICK_TOPICS.map((t, i) => (
+              <button
+                key={i}
+                onClick={() => sendMessage(t.question)}
+                disabled={streaming || !allChartData}
+                className="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition disabled:opacity-30"
+                style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+              >
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: t.color }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 pb-40">
+      <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: '140px' }}>
         <div className="mx-auto max-w-2xl space-y-4">
           {messages.length === 0 && (
-            <div className="py-8">
-              <p className="mb-6 text-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                {allChartData ? '排盘数据已就绪，选择一个问题开始对话' : '正在准备排盘数据...'}
+            <div className="py-12 text-center">
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                {allChartData ? '选择上方话题或输入问题开始对话' : '正在准备排盘数据...'}
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {PRESET_QUESTIONS.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(q)}
-                    disabled={streaming || !allChartData}
-                    className="rounded-xl px-4 py-3 text-left text-sm transition disabled:opacity-30"
-                    style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-surface)'; }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 

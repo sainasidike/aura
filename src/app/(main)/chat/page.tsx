@@ -28,6 +28,15 @@ const QUICK_TOPICS = [
   { label: '流年运势', color: '#8868b0', question: '请帮我分析一下我今年的流年运势' },
 ];
 
+const COLD_START_QUESTIONS = [
+  '请帮我全面分析一下我的命盘',
+  '我的性格有什么优缺点？',
+  '我的财运如何？适合什么方式理财？',
+  '我适合从事什么行业？',
+  '我的正缘会在什么时候出现？',
+  '我今年需要注意什么？',
+];
+
 export default function ChatPage() {
   return (
     <Suspense
@@ -309,10 +318,31 @@ function ChatContent() {
       <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: '140px' }}>
         <div className="mx-auto max-w-2xl space-y-4">
           {messages.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                {allChartData ? '选择上方话题或输入问题开始对话' : '正在准备排盘数据...'}
+            <div className="py-6">
+              <p className="mb-4 text-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                {allChartData ? '选择上方话题或试试以下问题' : '正在准备排盘数据...'}
               </p>
+              {allChartData && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {COLD_START_QUESTIONS.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => sendMessage(q)}
+                      disabled={streaming}
+                      className="rounded-full px-4 py-2 text-sm transition disabled:opacity-30"
+                      style={{
+                        border: '1px solid var(--border-subtle)',
+                        background: 'var(--bg-surface)',
+                        color: 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

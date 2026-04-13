@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState, useLayoutEffect } from 'react';
 import type { GlossaryEntry } from '@/lib/astrology-glossary';
 
 interface GlossaryPopupProps {
@@ -27,6 +27,7 @@ const CATEGORY_COLORS: Record<GlossaryEntry['category'], string> = {
 
 export default function GlossaryPopup({ entry, anchorRect, onClose }: GlossaryPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<React.CSSProperties>({});
 
   // Close on click outside
   const handleBackdropClick = useCallback(
@@ -46,53 +47,45 @@ export default function GlossaryPopup({ entry, anchorRect, onClose }: GlossaryPo
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [entry, onClose]);
 
-  // Compute position to keep popup within viewport
-  const getPosition = (): React.CSSProperties => {
-    if (!anchorRect || !popupRef.current) {
-      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-    }
+  // Compute position after popup is rendered and has actual dimensions
+  useLayoutEffect(() => {
+    if (!entry || !anchorRect) { setPos({}); return; }
 
-    const popup = popupRef.current;
-    const popupHeight = popup.offsetHeight || 280;
-    const popupWidth = Math.min(320, window.innerWidth - 24);
-    const margin = 8;
+    // Wait one frame so popup has rendered and we can measure it
+    const raf = requestAnimationFrame(() => {
+      const popup = popupRef.current;
+      const popupHeight = popup?.offsetHeight || 280;
+      const popupWidth = Math.min(320, window.innerWidth - 24);
+      const margin = 12;
 
-    // Horizontal: center on anchor, clamp to viewport
-    let left = anchorRect.left + anchorRect.width / 2 - popupWidth / 2;
-    left = Math.max(margin, Math.min(left, window.innerWidth - popupWidth - margin));
+      // Horizontal: center on anchor, clamp to viewport
+      let left = anchorRect.left + anchorRect.width / 2 - popupWidth / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - popupWidth - margin));
 
-    // Vertical: prefer above anchor; fall back to below if not enough space
-    const spaceAbove = anchorRect.top;
-    const spaceBelow = window.innerHeight - anchorRect.bottom;
+      // Vertical: prefer below anchor (more natural on mobile); fall back to above
+      const spaceAbove = anchorRect.top;
+      const spaceBelow = window.innerHeight - anchorRect.bottom;
 
-    let top: number;
-    let placement: 'above' | 'below';
-
-    if (spaceAbove >= popupHeight + margin) {
-      top = anchorRect.top - popupHeight - margin;
-      placement = 'above';
-    } else if (spaceBelow >= popupHeight + margin) {
-      top = anchorRect.bottom + margin;
-      placement = 'below';
-    } else {
-      // Not enough room either way — position with most available space and allow scrolling
-      if (spaceAbove > spaceBelow) {
-        top = Math.max(margin, anchorRect.top - popupHeight - margin);
-        placement = 'above';
-      } else {
+      let top: number;
+      if (spaceBelow >= popupHeight + margin) {
         top = anchorRect.bottom + margin;
-        placement = 'below';
+      } else if (spaceAbove >= popupHeight + margin) {
+        top = anchorRect.top - popupHeight - margin;
+      } else {
+        // Neither side has enough room — pin to bottom of viewport with scroll
+        top = Math.max(margin, window.innerHeight - popupHeight - margin);
       }
-    }
 
-    return {
-      position: 'fixed',
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${popupWidth}px`,
-      transformOrigin: placement === 'above' ? 'bottom center' : 'top center',
-    };
-  };
+      setPos({
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${popupWidth}px`,
+      });
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [entry, anchorRect]);
 
   if (!entry) return null;
 
@@ -108,7 +101,7 @@ export default function GlossaryPopup({ entry, anchorRect, onClose }: GlossaryPo
         ref={popupRef}
         className="glossary-popup"
         style={{
-          ...getPosition(),
+          ...pos,
           maxWidth: 320,
           borderRadius: 16,
           background: 'var(--bg-surface)',
@@ -117,6 +110,8 @@ export default function GlossaryPopup({ entry, anchorRect, onClose }: GlossaryPo
           padding: '16px 18px 14px',
           animation: 'glossaryFadeIn 0.2s ease-out',
           overflow: 'hidden',
+          // Start invisible until position is calculated
+          visibility: pos.top ? 'visible' : 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >

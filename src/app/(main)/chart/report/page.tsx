@@ -48,6 +48,38 @@ function ReportContent() {
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // 缓存 key
+  const cacheKey = profile ? `report_${profile.id}_${type}` : '';
+
+  // 页面加载时读取缓存
+  useEffect(() => {
+    if (!cacheKey) return;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data.report) setReport(data.report);
+        if (data.chatMessages) setChatMessages(data.chatMessages);
+        if (data.suggestedQuestions) setSuggestedQuestions(data.suggestedQuestions);
+        if (data.chartData) chartDataRef.current = data.chartData;
+      }
+    } catch { /* ignore */ }
+  }, [cacheKey]);
+
+  // 报告/聊天变化时写入缓存（仅在非 loading 时）
+  useEffect(() => {
+    if (!cacheKey || !report || loading) return;
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        report,
+        chatMessages,
+        suggestedQuestions,
+        chartData: chartDataRef.current,
+        timestamp: Date.now(),
+      }));
+    } catch { /* quota exceeded, ignore */ }
+  }, [cacheKey, report, chatMessages, suggestedQuestions, loading]);
+
   const handleCopyText = useCallback(async () => {
     if (!report) return;
     try {
@@ -147,6 +179,10 @@ function ReportContent() {
     setChartLoading(true);
     setError('');
     setReport('');
+    setChatMessages([]);
+    setSuggestedQuestions([]);
+    chartDataRef.current = null;
+    if (cacheKey) try { localStorage.removeItem(cacheKey); } catch { /* */ }
 
     try {
       const [astroRes, baziRes] = await Promise.all([
@@ -446,9 +482,9 @@ function ReportContent() {
           </div>
         )}
 
-        {/* Share buttons - shown when report is complete */}
+        {/* Share buttons + regenerate - shown when report is complete */}
         {report && !loading && (
-          <div className="mt-4 flex items-center justify-center gap-3 animate-fadeIn">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 animate-fadeIn">
             <button
               onClick={handleCopyText}
               className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
@@ -468,6 +504,16 @@ function ReportContent() {
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
               </svg>
               保存为图片
+            </button>
+            <button
+              onClick={generateReport}
+              className="flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              重新生成
             </button>
           </div>
         )}

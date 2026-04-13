@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProfiles, type StoredProfile } from "@/lib/storage";
+import { getGlossaryEntry } from "@/lib/astrology-glossary";
 import PersonSelector from "@/components/ui/PersonSelector";
 import Link from "next/link";
 
@@ -113,6 +114,8 @@ export default function FortunePage() {
   const [interpretations, setInterpretations] = useState<Record<string, string>>({});
   const [interpreting, setInterpreting] = useState(false);
   const [interpretDone, setInterpretDone] = useState(false);
+  // 行运相位解释弹窗
+  const [aspectPopup, setAspectPopup] = useState<{ transit: string; natal: string; type: string; nature: string; orb: number; rect: DOMRect } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const router = useRouter();
 
@@ -465,12 +468,19 @@ export default function FortunePage() {
                       {data.aspects.map((asp, i) => {
                         const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.08)", text: "#888" };
                         return (
-                          <span key={i} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.6rem] font-medium" style={{ background: ns.bg, color: ns.text }}>
+                          <button key={i}
+                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.6rem] font-medium transition active:scale-95"
+                            style={{ background: ns.bg, color: ns.text, border: 'none', cursor: 'pointer' }}
+                            onClick={(e) => {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setAspectPopup({ transit: asp.transit, natal: asp.natal, type: asp.type, nature: asp.nature, orb: asp.orb, rect });
+                            }}
+                          >
                             <span>{asp.transit}</span>
                             <span className="font-bold">{asp.type}</span>
                             <span>{asp.natal}</span>
                             <span className="opacity-50">{asp.orb}°</span>
-                          </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -514,6 +524,117 @@ export default function FortunePage() {
           </motion.button>
         </div>
       )}
+
+      {/* 行运相位解释弹窗 */}
+      <TransitAspectPopup data={aspectPopup} onClose={() => setAspectPopup(null)} />
+    </div>
+  );
+}
+
+// ── 行运相位解释弹窗组件 ──
+
+function TransitAspectPopup({ data, onClose }: {
+  data: { transit: string; natal: string; type: string; nature: string; orb: number; rect: DOMRect } | null;
+  onClose: () => void;
+}) {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (!data) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [data, onClose]);
+
+  useEffect(() => {
+    if (!data) { setPos({}); return; }
+    const raf = requestAnimationFrame(() => {
+      const popup = popupRef.current;
+      const popupHeight = popup?.offsetHeight || 300;
+      const popupWidth = Math.min(340, window.innerWidth - 24);
+      const margin = 12;
+      let left = data.rect.left + data.rect.width / 2 - popupWidth / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - popupWidth - margin));
+      const spaceBelow = window.innerHeight - data.rect.bottom;
+      let top: number;
+      if (spaceBelow >= popupHeight + margin) {
+        top = data.rect.bottom + margin;
+      } else if (data.rect.top >= popupHeight + margin) {
+        top = data.rect.top - popupHeight - margin;
+      } else {
+        top = Math.max(margin, window.innerHeight - popupHeight - margin);
+      }
+      setPos({ position: 'fixed' as const, top: `${top}px`, left: `${left}px`, width: `${popupWidth}px` });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [data]);
+
+  if (!data) return null;
+
+  // 提取行星名（去掉"行运"/"本命"前缀）
+  const transitPlanet = data.transit.replace(/^行运/, '');
+  const natalPlanet = data.natal.replace(/^本命/, '');
+  const transitEntry = getGlossaryEntry(transitPlanet);
+  const natalEntry = getGlossaryEntry(natalPlanet);
+  const aspectEntry = getGlossaryEntry(data.type);
+
+  const ns = NATURE_STYLE[data.nature] || { bg: 'rgba(128,128,128,0.08)', text: '#888' };
+  const natureLabel = data.nature === '和谐' ? '和谐相位，带来助力与顺畅' : data.nature === '紧张' ? '紧张相位，带来挑战与成长动力' : data.nature === '融合' ? '融合相位，能量合一强化' : '对立相位，需要平衡与整合';
+
+  return (
+    <div className="fixed inset-0 animate-fadeIn" style={{ zIndex: 300, background: 'rgba(0,0,0,0.2)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={popupRef} style={{
+        ...pos, maxWidth: 340, borderRadius: 16,
+        background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+        boxShadow: '0 12px 48px rgba(0,0,0,0.25)', padding: '16px 18px 14px',
+        visibility: pos.top ? 'visible' : 'hidden',
+      }} onClick={(e) => e.stopPropagation()}>
+        {/* 标题：行运 X 相位类型 本命 Y */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{data.transit}</span>
+          <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: ns.bg, color: ns.text }}>{data.type}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{data.natal}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 'auto' }}>容许度 {data.orb}°</span>
+        </div>
+
+        {/* 相位性质 */}
+        <div className="rounded-xl px-3 py-2 mb-3" style={{ background: ns.bg }}>
+          <p style={{ fontSize: 12, color: ns.text, fontWeight: 600, margin: 0 }}>
+            {data.nature} · {natureLabel}
+          </p>
+          {aspectEntry && (
+            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '4px 0 0', lineHeight: 1.5 }}>
+              {aspectEntry.brief}
+            </p>
+          )}
+        </div>
+
+        {/* 行运行星 */}
+        {transitEntry && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 18 }}>{transitEntry.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>行运{transitEntry.term}</span>
+              <span className="rounded-full px-2 py-0.5 text-[0.6rem]" style={{ background: '#c084fc18', color: '#c084fc' }}>行星</span>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.55 }}>{transitEntry.brief}</p>
+          </div>
+        )}
+
+        {/* 本命行星 */}
+        {natalEntry && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 18 }}>{natalEntry.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>本命{natalEntry.term}</span>
+              <span className="rounded-full px-2 py-0.5 text-[0.6rem]" style={{ background: '#c084fc18', color: '#c084fc' }}>行星</span>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.55 }}>{natalEntry.brief}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

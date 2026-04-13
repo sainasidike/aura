@@ -112,10 +112,12 @@ function placidusCusp(
     if (Math.abs(cosSA) > 1) return lon; // extreme latitude fallback
 
     const DSA = Math.acos(Math.max(-1, Math.min(1, cosSA))) * RAD;
+    // 东侧（MC→ASC）用昼半弧 DSA，西侧（MC→IC）用夜半弧 NSA
+    const semiArc = direction === 'east' ? DSA : (180 - DSA);
 
     const targetRA = direction === 'east'
-      ? normalize(RAMC + DSA * fraction)
-      : normalize(RAMC - DSA * fraction);
+      ? normalize(RAMC + semiArc * fraction)
+      : normalize(RAMC - semiArc * fraction);
 
     let diff = targetRA - ra;
     if (diff > 180) diff -= 360;

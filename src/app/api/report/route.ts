@@ -6,7 +6,251 @@ const SIGNS = ['白羊','金牛','双子','巨蟹','狮子','处女','天秤','�
 function lonToSign(lon: number) {
   const n = ((lon % 360) + 360) % 360;
   const si = Math.floor(n / 30);
-  return `${SIGNS[si]}${Math.floor(n - si * 30)}°`;
+  const deg = Math.floor(n - si * 30);
+  const min = Math.floor(((n - si * 30) - deg) * 60);
+  return `${SIGNS[si]}${deg}°${min}'`;
+}
+
+// 星座 → 守护星映射（传统守护）
+const SIGN_RULERS: Record<string, string> = {
+  '白羊': '火星', '金牛': '金星', '双子': '水星', '巨蟹': '月亮',
+  '狮子': '太阳', '处女': '水星', '天秤': '金星', '天蝎': '冥王星',
+  '射手': '木星', '摩羯': '土星', '水瓶': '天王星', '双鱼': '海王星',
+};
+
+// 星座元素
+const SIGN_ELEMENT: Record<string, string> = {
+  '白羊': '火', '金牛': '土', '双子': '风', '巨蟹': '水',
+  '狮子': '火', '处女': '土', '天秤': '风', '天蝎': '水',
+  '射手': '火', '摩羯': '土', '水瓶': '风', '双鱼': '水',
+};
+
+// 星座性质
+const SIGN_MODALITY: Record<string, string> = {
+  '白羊': '开创', '金牛': '固定', '双子': '变动', '巨蟹': '开创',
+  '狮子': '固定', '处女': '变动', '天秤': '开创', '天蝎': '固定',
+  '射手': '变动', '摩羯': '开创', '水瓶': '固定', '双鱼': '变动',
+};
+
+// 宫位名称
+const HOUSE_NAMES: Record<number, string> = {
+  1: '命宫', 2: '财帛宫', 3: '兄弟宫', 4: '田宅宫',
+  5: '子女宫', 6: '奴仆宫', 7: '夫妻宫', 8: '疾厄宫',
+  9: '迁移宫', 10: '官禄宫', 11: '福德宫', 12: '玄秘宫',
+};
+
+// 行星庙旺陷落
+const PLANET_DIGNITY: Record<string, { domicile: string[]; exaltation: string[]; detriment: string[]; fall: string[] }> = {
+  '太阳': { domicile: ['狮子'], exaltation: ['白羊'], detriment: ['水瓶'], fall: ['天秤'] },
+  '月亮': { domicile: ['巨蟹'], exaltation: ['金牛'], detriment: ['摩羯'], fall: ['天蝎'] },
+  '水星': { domicile: ['双子', '处女'], exaltation: ['处女'], detriment: ['射手', '双鱼'], fall: ['双鱼'] },
+  '金星': { domicile: ['金牛', '天秤'], exaltation: ['双鱼'], detriment: ['天蝎', '白羊'], fall: ['处女'] },
+  '火星': { domicile: ['白羊', '天蝎'], exaltation: ['摩羯'], detriment: ['天秤', '金牛'], fall: ['巨蟹'] },
+  '木星': { domicile: ['射手', '双鱼'], exaltation: ['巨蟹'], detriment: ['双子', '处女'], fall: ['摩羯'] },
+  '土星': { domicile: ['摩羯', '水瓶'], exaltation: ['天秤'], detriment: ['巨蟹', '狮子'], fall: ['白羊'] },
+};
+
+function getPlanetDignity(name: string, sign: string): string {
+  const d = PLANET_DIGNITY[name];
+  if (!d) return '';
+  if (d.domicile.includes(sign)) return '【入庙】';
+  if (d.exaltation.includes(sign)) return '【旺相】';
+  if (d.detriment.includes(sign)) return '【陷落】';
+  if (d.fall.includes(sign)) return '【落陷】';
+  return '';
+}
+
+type AstroData = {
+  houses?: { number: number; sign: string; degree: number; minute: number; longitude: number }[];
+  planets?: { name: string; sign: string; degree: number; minute?: number; house: number; longitude: number; retrograde: boolean }[];
+  aspects?: { planet1: string; planet2: string; type: string; orb: number; angle?: number }[];
+  ascendant?: number;
+  midheaven?: number;
+};
+
+type BaziData = {
+  fourPillars?: { year: { gan: string; zhi: string; ganZhi: string }; month: { gan: string; zhi: string; ganZhi: string }; day: { gan: string; zhi: string; ganZhi: string }; time: { gan: string; zhi: string; ganZhi: string } };
+  wuxing?: { year: string; month: string; day: string; time: string };
+  nayin?: { year: string; month: string; day: string; time: string };
+  shiShen?: { tianGan: { year: string; month: string; day: string; time: string }; diZhi: { year: string; month: string; day: string; time: string } };
+  hideGan?: { year: string[]; month: string[]; day: string[]; time: string[] };
+  diShi?: { year: string; month: string; day: string; time: string };
+  mingGong?: string;
+  shenGong?: string;
+  taiYuan?: string;
+  shengXiao?: string;
+  lunarDate?: string;
+  dayun?: { startAge: number; ganZhi: string; startYear: number; endYear: number }[];
+};
+
+type ProfileData = { name?: string; gender?: string; birthDate?: string; birthTime?: string; city?: string; longitude?: number; latitude?: number };
+
+/**
+ * 将星盘数据格式化为结构化文本，让 AI 能精准引用具体数据
+ */
+function formatChartDataForAI(chartData: Record<string, unknown>): string {
+  const astro = chartData.astrology as AstroData | undefined;
+  const bazi = chartData.bazi as BaziData | undefined;
+  const profile = chartData.profile as ProfileData | undefined;
+
+  const lines: string[] = [];
+
+  // 用户信息
+  if (profile) {
+    lines.push('## 用户基本信息');
+    if (profile.name) lines.push(`姓名: ${profile.name}`);
+    if (profile.gender) lines.push(`性别: ${profile.gender}`);
+    if (profile.birthDate) lines.push(`出生日期: ${profile.birthDate}`);
+    if (profile.birthTime) lines.push(`出生时间: ${profile.birthTime}`);
+    if (profile.city) lines.push(`出生地: ${profile.city}`);
+    lines.push('');
+  }
+
+  // 西洋占星
+  if (astro) {
+    lines.push('## 西洋占星本命盘');
+    lines.push('');
+
+    // 四轴
+    if (astro.houses && astro.houses.length >= 10) {
+      const h1 = astro.houses.find(h => h.number === 1);
+      const h4 = astro.houses.find(h => h.number === 4);
+      const h7 = astro.houses.find(h => h.number === 7);
+      const h10 = astro.houses.find(h => h.number === 10);
+      lines.push('### 四轴');
+      if (h1) lines.push(`- 上升点(ASC): ${lonToSign(h1.longitude)} — ${h1.sign}座 — 元素:${SIGN_ELEMENT[h1.sign] || '?'} 性质:${SIGN_MODALITY[h1.sign] || '?'} — 守护星:${SIGN_RULERS[h1.sign] || '?'}`);
+      if (h7) lines.push(`- 下降点(DSC): ${lonToSign(h7.longitude)} — ${h7.sign}座`);
+      if (h10) lines.push(`- 中天(MC): ${lonToSign(h10.longitude)} — ${h10.sign}座 — 守护星:${SIGN_RULERS[h10.sign] || '?'}`);
+      if (h4) lines.push(`- 天底(IC): ${lonToSign(h4.longitude)} — ${h4.sign}座`);
+      lines.push('');
+    }
+
+    // 行星位置
+    if (astro.planets && astro.planets.length > 0) {
+      lines.push('### 行星位置');
+      for (const p of astro.planets) {
+        const dignity = getPlanetDignity(p.name, p.sign);
+        const retro = p.retrograde ? ' (逆行)' : '';
+        const hName = HOUSE_NAMES[p.house] || '';
+        lines.push(`- ${p.name}: ${lonToSign(p.longitude)} ${p.sign}座 第${p.house}宫(${hName})${retro}${dignity ? ' ' + dignity : ''}`);
+      }
+      lines.push('');
+
+      // 行星元素分布
+      const elementCount: Record<string, number> = { '火': 0, '土': 0, '风': 0, '水': 0 };
+      const modalityCount: Record<string, number> = { '开创': 0, '固定': 0, '变动': 0 };
+      for (const p of astro.planets) {
+        if (p.name === '北交点') continue;
+        const el = SIGN_ELEMENT[p.sign];
+        const mod = SIGN_MODALITY[p.sign];
+        if (el) elementCount[el]++;
+        if (mod) modalityCount[mod]++;
+      }
+      lines.push('### 元素与性质分布');
+      lines.push(`- 元素: 火${elementCount['火']} 土${elementCount['土']} 风${elementCount['风']} 水${elementCount['水']}`);
+      lines.push(`- 性质: 开创${modalityCount['开创']} 固定${modalityCount['固定']} 变动${modalityCount['变动']}`);
+      lines.push('');
+    }
+
+    // 十二宫位 + 宫主星
+    if (astro.houses && astro.houses.length === 12) {
+      lines.push('### 十二宫位（宫头星座 & 宫主星）');
+      for (const h of astro.houses.sort((a, b) => a.number - b.number)) {
+        const ruler = SIGN_RULERS[h.sign] || '?';
+        const hName = HOUSE_NAMES[h.number] || '';
+        // 找到宫主星落在哪个宫
+        const rulerPlanet = astro.planets?.find(p => p.name === ruler);
+        const rulerInfo = rulerPlanet ? `→ 宫主星${ruler}落第${rulerPlanet.house}宫(${rulerPlanet.sign}座)` : '';
+        lines.push(`- 第${h.number}宫(${hName}): ${h.sign}座 ${lonToSign(h.longitude)} ${rulerInfo}`);
+      }
+      lines.push('');
+    }
+
+    // 宫内行星分布
+    if (astro.planets && astro.houses) {
+      lines.push('### 各宫内行星');
+      for (let i = 1; i <= 12; i++) {
+        const inHouse = astro.planets.filter(p => p.house === i);
+        if (inHouse.length > 0) {
+          lines.push(`- 第${i}宫(${HOUSE_NAMES[i]}): ${inHouse.map(p => p.name).join('、')}`);
+        }
+      }
+      const emptyHouses = Array.from({ length: 12 }, (_, i) => i + 1).filter(i => !astro.planets!.some(p => p.house === i));
+      if (emptyHouses.length > 0) {
+        lines.push(`- 空宫: ${emptyHouses.map(i => `第${i}宫`).join('、')}`);
+      }
+      lines.push('');
+    }
+
+    // 本命相位（按容许度排序，标注和谐/紧张）
+    if (astro.aspects && astro.aspects.length > 0) {
+      const sorted = [...astro.aspects].sort((a, b) => a.orb - b.orb);
+      const harmonious = ['合相', '六合', '三合'];
+      lines.push('### 本命相位（按容许度排序）');
+      lines.push('');
+      lines.push('**和谐相位:**');
+      const harmAsp = sorted.filter(a => harmonious.includes(a.type));
+      if (harmAsp.length > 0) {
+        for (const a of harmAsp) {
+          lines.push(`- ${a.planet1} ${a.type} ${a.planet2} (容许度${a.orb}°)`);
+        }
+      } else {
+        lines.push('- 无');
+      }
+      lines.push('');
+      lines.push('**紧张相位:**');
+      const tenseAsp = sorted.filter(a => !harmonious.includes(a.type));
+      if (tenseAsp.length > 0) {
+        for (const a of tenseAsp) {
+          lines.push(`- ${a.planet1} ${a.type} ${a.planet2} (容许度${a.orb}°)`);
+        }
+      } else {
+        lines.push('- 无');
+      }
+      lines.push('');
+    }
+  }
+
+  // 八字数据
+  if (bazi) {
+    lines.push('## 八字命盘');
+    lines.push('');
+
+    if (bazi.fourPillars) {
+      const fp = bazi.fourPillars;
+      lines.push('### 四柱');
+      lines.push(`|  | 年柱 | 月柱 | 日柱 | 时柱 |`);
+      lines.push(`|---|---|---|---|---|`);
+      lines.push(`| 干支 | ${fp.year.ganZhi} | ${fp.month.ganZhi} | ${fp.day.ganZhi} | ${fp.time.ganZhi} |`);
+      if (bazi.wuxing) lines.push(`| 五行 | ${bazi.wuxing.year} | ${bazi.wuxing.month} | ${bazi.wuxing.day} | ${bazi.wuxing.time} |`);
+      if (bazi.nayin) lines.push(`| 纳音 | ${bazi.nayin.year} | ${bazi.nayin.month} | ${bazi.nayin.day} | ${bazi.nayin.time} |`);
+      if (bazi.shiShen?.tianGan) lines.push(`| 十神(天干) | ${bazi.shiShen.tianGan.year} | ${bazi.shiShen.tianGan.month} | ${bazi.shiShen.tianGan.day} | ${bazi.shiShen.tianGan.time} |`);
+      if (bazi.shiShen?.diZhi) lines.push(`| 十神(地支) | ${bazi.shiShen.diZhi.year} | ${bazi.shiShen.diZhi.month} | ${bazi.shiShen.diZhi.day} | ${bazi.shiShen.diZhi.time} |`);
+      if (bazi.hideGan) lines.push(`| 藏干 | ${bazi.hideGan.year.join('/')} | ${bazi.hideGan.month.join('/')} | ${bazi.hideGan.day.join('/')} | ${bazi.hideGan.time.join('/')} |`);
+      if (bazi.diShi) lines.push(`| 十二长生 | ${bazi.diShi.year} | ${bazi.diShi.month} | ${bazi.diShi.day} | ${bazi.diShi.time} |`);
+      lines.push('');
+
+      lines.push(`日主: ${fp.day.gan}`);
+    }
+
+    if (bazi.mingGong) lines.push(`命宫: ${bazi.mingGong}`);
+    if (bazi.shenGong) lines.push(`身宫: ${bazi.shenGong}`);
+    if (bazi.taiYuan) lines.push(`胎元: ${bazi.taiYuan}`);
+    if (bazi.shengXiao) lines.push(`生肖: ${bazi.shengXiao}`);
+    if (bazi.lunarDate) lines.push(`农历: ${bazi.lunarDate}`);
+    lines.push('');
+
+    // 大运
+    if (bazi.dayun && bazi.dayun.length > 0) {
+      lines.push('### 大运');
+      for (const dy of bazi.dayun) {
+        lines.push(`- ${dy.startAge}岁起(${dy.startYear}-${dy.endYear}年): ${dy.ganZhi}`);
+      }
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /**
@@ -242,8 +486,8 @@ export async function POST(request: NextRequest) {
     // 为各类报告计算未来行运触发数据
     let extraContext = '';
     try {
-      const astro = chartData.astrology as { houses?: { number: number; longitude: number }[]; planets?: { name: string; sign: string; degree: number; house: number; longitude: number; retrograde: boolean }[]; aspects?: { planet1: string; planet2: string; type: string; orb: number }[]; ascendant?: number; midheaven?: number };
-      const profile = chartData.profile as { longitude?: number; latitude?: number };
+      const astro = chartData.astrology as AstroData;
+      const profile = chartData.profile as ProfileData;
 
       if (profile.latitude && profile.longitude) {
         if (type === 'love') {
@@ -280,10 +524,13 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* 计算失败不影响报告生成 */ }
 
+    // 将星盘数据格式化为结构化文本
+    const formattedData = formatChartDataForAI(chartData);
+
     const messages: ZhipuMessage[] = [
       {
         role: 'system',
-        content: `${systemPrompt}\n\n## 用户星盘数据\n\`\`\`json\n${JSON.stringify(chartData, null, 2)}\n\`\`\`${extraContext}\n\nAI 绝不自行计算或修改排盘数据，只基于上述数据进行解读。`,
+        content: `${systemPrompt}\n\n${formattedData}${extraContext}\n\n**重要提醒**：\n- AI 绝不自行计算或修改排盘数据，只基于上述数据进行解读\n- 分析时必须引用上方提供的具体数据（精确到度数、宫位、相位容许度），禁止泛泛而谈\n- 注意行星的庙旺陷落状态，这影响行星能量的发挥\n- 注意宫主星的落宫位置，这揭示该宫事务在哪个领域展开\n- 注意和谐相位与紧张相位的对比，两者构成人生的助力与课题\n- 结合八字十神和大运信息做辅助判断`,
       },
       {
         role: 'user',

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import ShareModal from '@/components/ui/ShareModal';
 
 const REPORT_META: Record<string, { title: string; icon: string; color: string }> = {
   love: { title: '正缘报告', icon: '♡', color: '#d07090' },
@@ -31,7 +32,95 @@ function ReportContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [chartLoading, setChartLoading] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleCopyText = useCallback(async () => {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setShareOpen(false);
+    } catch {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = report;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setShareOpen(false);
+    }
+  }, [report]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (!contentRef.current || !report || !profile) return;
+    setShareLoading(true);
+    try {
+      const html2canvas = (await import('html2canvas-pro')).default;
+
+      // 创建离屏容器渲染报告长图
+      const container = document.createElement('div');
+      container.style.cssText = `
+        position:fixed;left:-9999px;top:0;width:390px;
+        background:#f8f7fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        color:#2d2b3d;font-size:13px;line-height:1.6;
+      `;
+
+      // 头部
+      container.innerHTML = `
+        <div style="background:linear-gradient(135deg,${meta.color},${meta.color}cc);padding:28px 20px 22px;color:#fff">
+          <div style="font-size:28px;margin-bottom:6px">${meta.icon}</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:0.5px">${meta.title}</div>
+          <div style="font-size:12px;margin-top:6px;opacity:0.85">${profile.name} · ${profile.year}.${profile.month}.${profile.day}</div>
+        </div>
+      `;
+
+      // 报告内容
+      const body = document.createElement('div');
+      body.style.cssText = 'padding:20px;font-size:13px;line-height:1.8;color:#2d2b3d';
+      body.innerHTML = simpleMarkdown(report);
+      container.appendChild(body);
+
+      // 水印
+      const footer = document.createElement('div');
+      footer.style.cssText = 'text-align:center;padding:16px 0 24px;font-size:11px;color:#bbb';
+      footer.textContent = '✦ 由 Aura AI 占星师生成 · 仅供参考与娱乐';
+      container.appendChild(footer);
+
+      document.body.appendChild(container);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        backgroundColor: '#f8f7fc',
+        useCORS: true,
+        logging: false,
+      });
+      document.body.removeChild(container);
+
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${meta.title}_${profile.name}_${new Date().toISOString().slice(0, 10)}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+
+      setShareOpen(false);
+    } catch (e) {
+      console.error('生成图片失败:', e);
+    }
+    setShareLoading(false);
+  }, [report, meta, profile]);
 
   useEffect(() => {
     if (paramProfileId) {
@@ -243,7 +332,41 @@ function ReportContent() {
             <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
           </div>
         )}
+
+        {/* Share buttons - shown when report is complete */}
+        {report && !loading && (
+          <div className="mt-4 flex items-center justify-center gap-3 animate-fadeIn">
+            <button
+              onClick={handleCopyText}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+              {copied ? '已复制' : '复制全文'}
+            </button>
+            <button
+              onClick={() => setShareOpen(true)}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ background: 'var(--gradient-primary)', color: 'var(--text-inverse)', boxShadow: '0 4px 16px rgba(123,108,184,0.25)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+              </svg>
+              保存为图片
+            </button>
+          </div>
+        )}
       </div>
+
+      <ShareModal
+        open={shareOpen}
+        loading={shareLoading}
+        onClose={() => setShareOpen(false)}
+        onCopyText={handleCopyText}
+        onSaveImage={handleSaveImage}
+      />
     </div>
   );
 }

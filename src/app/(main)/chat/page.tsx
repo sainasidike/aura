@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
@@ -14,23 +14,6 @@ interface Message {
   content: string;
   timestamp?: number;
 }
-
-type ChartMode = 'astrology' | 'bazi' | 'ziwei' | 'mixed';
-
-const MODE_ORDER: ChartMode[] = ['mixed', 'astrology', 'bazi', 'ziwei'];
-const MODE_LABELS: Record<ChartMode, string> = {
-  mixed: '综合',
-  astrology: '星盘',
-  bazi: '八字',
-  ziwei: '紫微',
-};
-
-const QUICK_TOPICS = [
-  { label: '今日运势', color: '#5bc084', question: '请帮我分析一下我今天的运势如何？' },
-  { label: '情感分析', color: '#d07090', question: '请帮我分析一下我的感情婚姻方面有什么特点？' },
-  { label: '事业指引', color: '#e0a040', question: '请帮我分析一下我的事业运势和职业方向' },
-  { label: '流年运势', color: '#8868b0', question: '请帮我分析一下我今年的流年运势' },
-];
 
 const COLD_START_QUESTIONS = [
   '请帮我全面分析一下我的命盘',
@@ -57,7 +40,6 @@ export default function ChatPage() {
 
 function ChatContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const paramProfileId = searchParams.get('profileId');
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
@@ -65,7 +47,6 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [mode, setMode] = useState<ChartMode>('mixed');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [toast, setToast] = useState('');
 
@@ -91,7 +72,7 @@ function ChatContent() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchMoved = useRef(false);
 
-  const chatStorageKey = (id: string, m: ChartMode) => `aura_chat_${id}_${m}`;
+  const chatStorageKey = (id: string) => `aura_chat_${id}`;
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -125,7 +106,6 @@ function ChatContent() {
         const pending = JSON.parse(raw);
         if (pending.question && pending.chartData) {
           setAstroContext({ chartData: pending.chartData, analysisType: pending.analysisType });
-          setMode('astrology');
           setMessages([]);
           setSuggestions([]);
           setAutoSendQuestion(pending.question);
@@ -148,21 +128,21 @@ function ChatContent() {
     if (astroContext) return;
     if (!profileIdRef.current) return;
     try {
-      const saved = localStorage.getItem(chatStorageKey(profileIdRef.current, mode));
+      const saved = localStorage.getItem(chatStorageKey(profileIdRef.current));
       setMessages(saved ? JSON.parse(saved) : []);
     } catch { setMessages([]); }
     setSuggestions([]);
     exitSelectMode();
-  }, [mode, profile, astroContext]);
+  }, [profile, astroContext]);
 
   // Save & scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     if (!streaming && messages.length > 0 && profileIdRef.current) {
-      try { localStorage.setItem(chatStorageKey(profileIdRef.current, mode), JSON.stringify(messages)); }
+      try { localStorage.setItem(chatStorageKey(profileIdRef.current), JSON.stringify(messages)); }
       catch { /* ignore */ }
     }
-  }, [messages, streaming, mode]);
+  }, [messages, streaming]);
 
   const fetchAllChartData = async (p: StoredProfile) => {
     try {
@@ -171,32 +151,46 @@ function ChatContent() {
         hour: p.hour, minute: p.minute, gender: p.gender,
         longitude: p.longitude, latitude: p.latitude, timezone: p.timezone,
       };
-      const [baziRes, ziweiRes, astroRes] = await Promise.all([
-        fetch('/api/bazi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-        fetch('/api/ziwei', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-        fetch('/api/astrology', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+      const opts = { method: 'POST' as const, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+      const results = await Promise.allSettled([
+        fetch('/api/bazi', opts),
+        fetch('/api/ziwei', opts),
+        fetch('/api/astrology/transit', opts),
+        fetch('/api/astrology/solar-return', opts),
+        fetch('/api/astrology/lunar-return', opts),
       ]);
-      const bazi = await baziRes.json();
-      const ziwei = await ziweiRes.json();
-      const astro = await astroRes.json();
-      setAllChartData({
+
+      const parse = async (r: PromiseSettledResult<Response>) => {
+        if (r.status === 'fulfilled' && r.value.ok) return r.value.json();
+        return null;
+      };
+      const [bazi, ziwei, transit, solarReturn, lunarReturn] = await Promise.all(results.map(parse));
+
+      const data: Record<string, unknown> = {
         profile: { name: p.name, gender: p.gender, birthDate: `${p.year}-${p.month}-${p.day}`, birthTime: `${p.hour}:${p.minute}`, city: p.city },
-        bazi: bazi.chart, ziwei: ziwei.chart, astrology: astro.chart, timeInfo: bazi.timeInfo,
-      });
+        timeInfo: bazi?.timeInfo,
+      };
+      if (bazi?.chart) data.bazi = bazi.chart;
+      if (ziwei?.chart) data.ziwei = ziwei.chart;
+      if (transit) {
+        data.natalChart = transit.natalChart;
+        data.transitChart = transit.transitChart;
+        data.crossAspects = transit.crossAspects;
+        data.transitTime = transit.transitTime;
+      }
+      if (solarReturn) {
+        data.solarReturn = { year: solarReturn.year, returnMoment: solarReturn.returnMoment, chart: solarReturn.chart };
+      }
+      if (lunarReturn) {
+        data.lunarReturn = { returnMoment: lunarReturn.returnMoment, nextReturn: lunarReturn.nextReturn, chart: lunarReturn.chart };
+      }
+      setAllChartData(data);
     } catch { /* chart fetch failed, can still chat */ }
   };
 
-  const getChartDataForMode = (): Record<string, unknown> | null => {
-    // Use astrology page context when available (transit/return analysis)
+  const getChartData = (): Record<string, unknown> | null => {
     if (astroContext) return astroContext.chartData;
-    if (!allChartData) return null;
-    const base = { profile: allChartData.profile, timeInfo: allChartData.timeInfo };
-    switch (mode) {
-      case 'astrology': return { ...base, astrology: allChartData.astrology };
-      case 'bazi': return { ...base, bazi: allChartData.bazi };
-      case 'ziwei': return { ...base, ziwei: allChartData.ziwei };
-      case 'mixed': return allChartData;
-    }
+    return allChartData;
   };
 
   // ─── Send message ───
@@ -217,8 +211,7 @@ function ChatContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          chartData: getChartDataForMode(),
-          mode,
+          chartData: getChartData(),
           ...(astroContext?.analysisType ? { analysisType: astroContext.analysisType } : {}),
         }),
       });
@@ -341,9 +334,9 @@ function ChatContent() {
     setMessages(remaining);
     if (profileIdRef.current) {
       if (remaining.length === 0) {
-        localStorage.removeItem(chatStorageKey(profileIdRef.current, mode));
+        localStorage.removeItem(chatStorageKey(profileIdRef.current));
       } else {
-        localStorage.setItem(chatStorageKey(profileIdRef.current, mode), JSON.stringify(remaining));
+        localStorage.setItem(chatStorageKey(profileIdRef.current), JSON.stringify(remaining));
       }
     }
     exitSelectMode();
@@ -355,7 +348,7 @@ function ChatContent() {
   const handleDeleteAll = () => {
     setMessages([]);
     setSuggestions([]);
-    if (profileIdRef.current) localStorage.removeItem(chatStorageKey(profileIdRef.current, mode));
+    if (profileIdRef.current) localStorage.removeItem(chatStorageKey(profileIdRef.current));
     exitSelectMode();
     setShowConfirm(false);
     showToast('对话已清除');
@@ -386,7 +379,7 @@ function ChatContent() {
       const blob = await generateChatImage({
         messages: msgs,
         profileName: profile.name,
-        modeName: MODE_LABELS[mode],
+        modeName: 'AI 占星师',
       });
       downloadBlob(blob, `AI占星师_${profile.name}_${Date.now()}.png`);
       setShowShare(false);
@@ -475,49 +468,13 @@ function ChatContent() {
                 )}
               </div>
 
-              {/* Mode selector */}
-              <div className="mt-2.5 flex items-center gap-1.5">
-                {MODE_ORDER.map(m => (
-                  <button
-                    key={m}
-                    onClick={() => { setAstroContext(null); setMode(m); }}
-                    className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all"
-                    style={mode === m
-                      ? { background: 'var(--accent-primary)', color: '#fff', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
-                      : { color: 'var(--text-tertiary)', background: 'transparent' }
-                    }
-                  >
-                    {MODE_LABELS[m]}
-                  </button>
-                ))}
-              </div>
-
-              {/* Quick topics */}
-              <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-0.5">
-                {QUICK_TOPICS.map((t, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(t.question)}
-                    disabled={streaming || !allChartData}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all disabled:opacity-30"
-                    style={{
-                      background: 'var(--bg-surface)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-subtle)',
-                    }}
-                  >
-                    <span className="inline-block h-[7px] w-[7px] rounded-full" style={{ background: t.color }} />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
             </>
           )}
         </div>
       </div>
 
       {/* ─── Messages ─── */}
-      <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: selectMode ? '60px' : '148px' }}>
+      <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: selectMode ? '60px' : '68px' }}>
         <div className="mx-auto max-w-2xl space-y-5">
           {/* Cold start */}
           {messages.length === 0 && (
@@ -535,7 +492,7 @@ function ChatContent() {
                 </p>
                 {allChartData && (
                   <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    选择上方话题或试试以下问题
+                    基于你的完整星盘数据，试试以下问题
                   </p>
                 )}
               </div>
@@ -750,7 +707,7 @@ function ChatContent() {
       <ConfirmModal
         open={showConfirm}
         title={selectMode ? `删除 ${selected.size} 条消息` : '清除全部对话'}
-        message={selectMode ? '选中的消息将被永久删除，无法恢复。' : '当前模式的所有对话记录将被清除，无法恢复。'}
+        message={selectMode ? '选中的消息将被永久删除，无法恢复。' : '所有对话记录将被清除，无法恢复。'}
         confirmText="删除"
         destructive
         onConfirm={selectMode ? handleDeleteSelected : handleDeleteAll}

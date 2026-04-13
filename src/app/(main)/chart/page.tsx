@@ -16,6 +16,10 @@ const AI_REPORTS = [
   { type: 'health', icon: '✦', iconBg: 'linear-gradient(135deg, #50b09018, #50b09008)', iconColor: '#40a080', title: '健康报告', desc: 'AI 健康分析' },
 ];
 
+const INTERACTIVE = [
+  { href: '/chart/compatibility', icon: '♡♡', iconBg: 'linear-gradient(135deg, #e0609018, #d0709008)', iconColor: '#d06080', title: '合盘配对', desc: '双人星盘配对分析' },
+];
+
 const COMING_SOON = ['MBTI 测试', '生命数字', '占星骰子'];
 
 export default function ToolsPage() {
@@ -40,6 +44,29 @@ export default function ToolsPage() {
                   boxShadow: 'var(--shadow-card)',
                 }}>
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-xl transition-transform group-active:scale-95"
+                  style={{ background: tool.iconBg, color: tool.iconColor }}>
+                  {tool.icon}
+                </div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{tool.title}</p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>{tool.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* 互动功能 */}
+        <section className="mb-8">
+          <h2 className="mb-3 text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>互动功能</h2>
+          <div className="stagger-children grid grid-cols-2 gap-3">
+            {INTERACTIVE.map(tool => (
+              <Link key={tool.href} href={tool.href}
+                className="group rounded-2xl p-4 transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--bg-base)',
+                  border: '1px solid var(--border-subtle)',
+                  boxShadow: 'var(--shadow-card)',
+                }}>
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-base transition-transform group-active:scale-95"
                   style={{ background: tool.iconBg, color: tool.iconColor }}>
                   {tool.icon}
                 </div>

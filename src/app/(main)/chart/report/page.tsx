@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
+import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ShareModal from '@/components/ui/ShareModal';
 
 const REPORT_META: Record<string, { title: string; icon: string; color: string }> = {
@@ -35,7 +37,16 @@ function ReportContent() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  // 追问对话
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const chartDataRef = useRef<Record<string, unknown> | null>(null);
+  const [glossaryEntry, setGlossaryEntry] = useState<GlossaryEntry | null>(null);
+  const [glossaryRect, setGlossaryRect] = useState<DOMRect | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const handleCopyText = useCallback(async () => {
     if (!report) return;
@@ -173,6 +184,7 @@ function ReportContent() {
         astrology: astroData.chart,
         bazi: baziData.chart,
       };
+      chartDataRef.current = chartData;
 
       const res = await fetch('/api/report', {
         method: 'POST',
@@ -228,6 +240,106 @@ function ReportContent() {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
   }, [report]);
+
+  // 滚动到对话底部
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, chatLoading]);
+
+  // Glossary 点击事件委托
+  const handleGlossaryClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('.glossary-term') as HTMLElement | null;
+    if (!target) return;
+    const term = target.getAttribute('data-term');
+    if (!term) return;
+    const entry = getGlossaryEntry(term);
+    if (entry) {
+      setGlossaryEntry(entry);
+      setGlossaryRect(target.getBoundingClientRect());
+    }
+  }, []);
+
+  // 从 AI 回复中提取推荐追问
+  const extractSuggestions = (text: string): { cleaned: string; questions: string[] } => {
+    const match = text.match(/\[推荐追问\]\s*\n?([\s\S]*?)$/);
+    if (!match) return { cleaned: text, questions: [] };
+    const cleaned = text.slice(0, match.index).trimEnd();
+    const questions = match[1]
+      .split('\n')
+      .map(l => l.replace(/^\d+\.\s*/, '').trim())
+      .filter(l => l.length > 0);
+    return { cleaned, questions };
+  };
+
+  // 发送追问
+  const sendChatMessage = async (question?: string) => {
+    const msg = question || chatInput.trim();
+    if (!msg || chatLoading || !report || !chartDataRef.current) return;
+    setChatInput('');
+    setSuggestedQuestions([]);
+
+    const newMessages = [...chatMessages, { role: 'user' as const, content: msg }];
+    setChatMessages(newMessages);
+    setChatLoading(true);
+
+    let assistantContent = '';
+    try {
+      const res = await fetch('/api/report/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          reportContent: report,
+          chartData: chartDataRef.current,
+          reportType: type,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || '回答失败');
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No stream');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.content) {
+              assistantContent += parsed.content;
+              setChatMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      // 提取推荐追问
+      const { cleaned, questions } = extractSuggestions(assistantContent);
+      if (questions.length > 0) {
+        setChatMessages([...newMessages, { role: 'assistant', content: cleaned }]);
+        setSuggestedQuestions(questions);
+      }
+    } catch (e) {
+      setChatMessages([...newMessages, { role: 'assistant', content: `抱歉，${e instanceof Error ? e.message : '回答失败'}` }]);
+    }
+    setChatLoading(false);
+  };
 
   if (!profile) {
     return (
@@ -323,7 +435,8 @@ function ReportContent() {
               color: 'var(--text-secondary)',
               boxShadow: 'var(--shadow-card)',
             }}
-            dangerouslySetInnerHTML={{ __html: simpleMarkdown(report) }}
+            onClick={handleGlossaryClick}
+            dangerouslySetInnerHTML={{ __html: annotateGlossaryTerms(simpleMarkdown(report)) }}
           />
         )}
 
@@ -358,6 +471,99 @@ function ReportContent() {
             </button>
           </div>
         )}
+
+        {/* Follow-up Chat Section */}
+        {report && !loading && (
+          <div className="mt-6 animate-fadeIn">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-sm" style={{ color: meta.color }}>✦</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>对报告有疑问？追问 AI</span>
+            </div>
+
+            {/* Suggested questions */}
+            {chatMessages.length === 0 && suggestedQuestions.length === 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {[
+                  '帮我解释一下报告中提到的关键相位',
+                  '我最需要注意的是什么？',
+                  '能更详细地分析时间窗口吗？',
+                ].map(q => (
+                  <button key={q} onClick={() => sendChatMessage(q)}
+                    className="rounded-full px-3 py-1.5 text-xs transition active:scale-95"
+                    style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Chat messages */}
+            {chatMessages.length > 0 && (
+              <div className="space-y-3 mb-3">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm"
+                      style={msg.role === 'user'
+                        ? { background: 'var(--gradient-primary)', color: '#fff', borderBottomRightRadius: '4px' }
+                        : { background: 'var(--bg-base)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderBottomLeftRadius: '4px' }
+                      }
+                    >
+                      {msg.role === 'assistant'
+                        ? <div className="prose-chat" dangerouslySetInnerHTML={{ __html: simpleMarkdown(msg.content) }} />
+                        : msg.content
+                      }
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl px-4 py-3" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)' }}>
+                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+
+            {/* Suggested from AI */}
+            {suggestedQuestions.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {suggestedQuestions.map(q => (
+                  <button key={q} onClick={() => sendChatMessage(q)}
+                    className="rounded-full px-3 py-1.5 text-xs transition active:scale-95"
+                    style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && sendChatMessage()}
+                placeholder="输入你的问题..."
+                disabled={chatLoading}
+                className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition disabled:opacity-50"
+                style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}
+              />
+              <button
+                onClick={() => sendChatMessage()}
+                disabled={chatLoading || !chatInput.trim()}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
+                style={{ background: 'var(--gradient-primary)', color: '#fff' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ShareModal
@@ -367,6 +573,26 @@ function ReportContent() {
         onCopyText={handleCopyText}
         onSaveImage={handleSaveImage}
       />
+
+      <GlossaryPopup
+        entry={glossaryEntry}
+        anchorRect={glossaryRect}
+        onClose={() => { setGlossaryEntry(null); setGlossaryRect(null); }}
+      />
+
+      {/* Glossary term inline styles */}
+      <style jsx global>{`
+        .glossary-term {
+          color: var(--accent-primary);
+          text-decoration: underline;
+          text-decoration-style: dotted;
+          text-underline-offset: 3px;
+          text-decoration-thickness: 1px;
+          cursor: pointer;
+          transition: opacity 0.15s;
+        }
+        .glossary-term:hover { opacity: 0.75; }
+      `}</style>
     </div>
   );
 }

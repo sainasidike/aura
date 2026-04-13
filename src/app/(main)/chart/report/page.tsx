@@ -80,7 +80,7 @@ function ReportContent() {
       setLoading(true);
 
       const chartData = {
-        profile: { name: profile.name, gender: profile.gender, birthDate: `${profile.year}-${profile.month}-${profile.day}`, birthTime: `${profile.hour}:${profile.minute}`, city: profile.city },
+        profile: { name: profile.name, gender: profile.gender, birthDate: `${profile.year}-${profile.month}-${profile.day}`, birthTime: `${profile.hour}:${profile.minute}`, city: profile.city, longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone },
         astrology: astroData.chart,
         bazi: baziData.chart,
       };

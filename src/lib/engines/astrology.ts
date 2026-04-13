@@ -169,6 +169,66 @@ function calculatePlacidusHouses(asc: number, mc: number, RAMC: number, epsilon:
 }
 
 /**
+ * Alcabitius (阿卡比特) 宫位制
+ * 将上升点的昼半弧和夜半弧各三等分，
+ * 再将赤道等分点通过赤经→黄经投影到黄道。
+ */
+function calculateAlcabitiusHouses(asc: number, mc: number, RAMC: number, epsilon: number, latitude: number): HousePosition[] {
+  const eps = epsilon * DEG;
+  const ascRad = asc * DEG;
+
+  // 上升点赤经
+  const RAAC = normalize(Math.atan2(Math.sin(ascRad) * Math.cos(eps), Math.cos(ascRad)) * RAD);
+
+  // 昼半弧 DSA = 赤道上从 MC 到 ASC 的弧度
+  let DSA = RAAC - RAMC;
+  if (DSA < 0) DSA += 360;
+  if (DSA > 180) {
+    // 极端情况，回退等宫制
+    return calculateEqualHouses(asc);
+  }
+
+  const NSA = 180 - DSA;
+
+  // 赤道三等分
+  const ra11 = normalize(RAMC + DSA / 3);
+  const ra12 = normalize(RAMC + 2 * DSA / 3);
+  const ra2  = normalize(RAAC + NSA / 3);
+  const ra3  = normalize(RAAC + 2 * NSA / 3);
+
+  // 赤经 → 黄经（与 MC 相同的投影公式）
+  function raToLon(ra: number): number {
+    const raRad = ra * DEG;
+    return normalize(Math.atan2(Math.sin(raRad), Math.cos(raRad) * Math.cos(eps)) * RAD);
+  }
+
+  const cusp11 = raToLon(ra11);
+  const cusp12 = raToLon(ra12);
+  const cusp2 = raToLon(ra2);
+  const cusp3 = raToLon(ra3);
+
+  const ic = normalize(mc + 180);
+  const desc = normalize(asc + 180);
+  const cusp5 = normalize(cusp11 + 180);
+  const cusp6 = normalize(cusp12 + 180);
+  const cusp8 = normalize(cusp2 + 180);
+  const cusp9 = normalize(cusp3 + 180);
+
+  const cusps = [asc, cusp2, cusp3, ic, cusp5, cusp6, desc, cusp8, cusp9, mc, cusp11, cusp12];
+
+  return cusps.map((lon, i) => {
+    const info = lonToSign(lon);
+    return {
+      number: i + 1,
+      sign: info.sign,
+      degree: info.degree,
+      minute: info.minute,
+      longitude: lon,
+    };
+  });
+}
+
+/**
  * 等宫制 (高纬度备用)
  */
 function calculateEqualHouses(asc: number): HousePosition[] {
@@ -259,12 +319,12 @@ export function calculateAstrology(
   const asc = calculateASC(RAMC, epsilon, latitude);
   const mc = calculateMC(RAMC, epsilon);
 
-  // Placidus (fallback to Equal House above 66° latitude)
+  // Alcabitius 阿卡比特宫位制 (高纬度 > 66° 回退等宫制)
   let houses: HousePosition[];
   if (Math.abs(latitude) > 66) {
     houses = calculateEqualHouses(asc);
   } else {
-    houses = calculatePlacidusHouses(asc, mc, RAMC, epsilon, latitude);
+    houses = calculateAlcabitiusHouses(asc, mc, RAMC, epsilon, latitude);
   }
 
   const planets: PlanetPosition[] = [];
@@ -339,11 +399,12 @@ export function calculateChartFromDate(
   const asc = calculateASC(RAMC, epsilon, latitude);
   const mc = calculateMC(RAMC, epsilon);
 
+  // Alcabitius 阿卡比特宫位制
   let houses: HousePosition[];
   if (Math.abs(latitude) > 66) {
     houses = calculateEqualHouses(asc);
   } else {
-    houses = calculatePlacidusHouses(asc, mc, RAMC, epsilon, latitude);
+    houses = calculateAlcabitiusHouses(asc, mc, RAMC, epsilon, latitude);
   }
 
   const planets: PlanetPosition[] = [];

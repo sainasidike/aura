@@ -217,11 +217,25 @@ function ChatContent() {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last?.role === 'assistant' && last.content) {
-        const match = last.content.match(/```\s*\n?\[推荐问题\]\s*\n([\s\S]*?)```/);
-        if (match) {
-          const questions = match[1].trim().split('\n').map(q => q.trim()).filter(Boolean).slice(0, 3);
-          setSuggestions(questions);
-          last.content = last.content.replace(/```\s*\n?\[推荐问题\]\s*\n[\s\S]*?```/, '').trimEnd();
+        // Match various formats: [推荐追问], [推荐问题], with or without code blocks
+        const patterns = [
+          /```\s*\n?\[推荐[追问题]+\]\s*\n([\s\S]*?)```/,
+          /\[推荐[追问题]+\]\s*\n((?:\d+[.、]\s*.+\n?){1,3})/,
+          /\*?\*?推荐[追问题]+\*?\*?[:：]\s*\n((?:\d+[.、]\s*.+\n?){1,3})/,
+        ];
+        for (const pattern of patterns) {
+          const match = last.content.match(pattern);
+          if (match) {
+            const questions = match[1].trim().split('\n')
+              .map(q => q.replace(/^\d+[.、]\s*/, '').trim())
+              .filter(Boolean)
+              .slice(0, 3);
+            if (questions.length > 0) {
+              setSuggestions(questions);
+              last.content = last.content.replace(pattern, '').trimEnd();
+              break;
+            }
+          }
         }
       }
       return updated;

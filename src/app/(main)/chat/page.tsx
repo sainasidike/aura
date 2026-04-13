@@ -62,6 +62,7 @@ function ChatContent() {
   const [streaming, setStreaming] = useState(false);
   const [mode, setMode] = useState<ChartMode>('mixed');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [toast, setToast] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const profileIdRef = useRef<string | null>(null);
 
@@ -250,6 +251,36 @@ function ChatContent() {
     });
   };
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const handleDelete = () => {
+    if (!messages.length) return;
+    if (!confirm('确定要清除当前对话记录吗？')) return;
+    setMessages([]);
+    setSuggestions([]);
+    if (profileIdRef.current) {
+      localStorage.removeItem(chatStorageKey(profileIdRef.current, mode));
+    }
+    showToast('对话已清除');
+  };
+
+  const handleShare = async () => {
+    if (!messages.length) return;
+    const text = messages
+      .map(m => `${m.role === 'user' ? '我' : 'AI占星师'}：${m.content}`)
+      .join('\n\n');
+    const shareData = { title: 'AI占星师对话', text };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      showToast('对话已复制到剪贴板');
+    }
+  };
+
   if (!profile) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -274,10 +305,36 @@ function ChatContent() {
         }}
       >
         <div className="mx-auto max-w-2xl">
-          {/* Title */}
-          <p className="text-lg font-semibold" style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-display)' }}>
-            ✦ AI 占星师
-          </p>
+          {/* Title + actions */}
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-semibold" style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-display)' }}>
+              ✦ AI 占星师
+            </p>
+            {messages.length > 0 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleShare}
+                  className="rounded-lg p-1.5 transition"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  title="分享对话"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="rounded-lg p-1.5 transition"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  title="清除对话"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Mode selector */}
           <div className="mt-2 flex items-center gap-1">
@@ -421,6 +478,16 @@ function ChatContent() {
           </button>
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg"
+          style={{ background: 'rgba(0,0,0,0.75)', zIndex: 100 }}
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

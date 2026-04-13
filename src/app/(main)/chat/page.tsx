@@ -53,6 +53,7 @@ function ChatContent() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [mode, setMode] = useState<ChartMode>('astrology');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const profileIdRef = useRef<string | null>(null);
 
@@ -84,6 +85,7 @@ function ChatContent() {
     } catch {
       setMessages([]);
     }
+    setSuggestions([]);
   }, [mode, profile]);
 
   // Save conversation & scroll
@@ -144,6 +146,7 @@ function ChatContent() {
     const userMsg: Message = { role: 'user', content: content.trim() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setSuggestions([]);
     setStreaming(true);
 
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -208,6 +211,21 @@ function ChatContent() {
     }
 
     setStreaming(false);
+
+    // Parse suggested questions from the last assistant message
+    setMessages(prev => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === 'assistant' && last.content) {
+        const match = last.content.match(/```\s*\n?\[推荐问题\]\s*\n([\s\S]*?)```/);
+        if (match) {
+          const questions = match[1].trim().split('\n').map(q => q.trim()).filter(Boolean).slice(0, 3);
+          setSuggestions(questions);
+          last.content = last.content.replace(/```\s*\n?\[推荐问题\]\s*\n[\s\S]*?```/, '').trimEnd();
+        }
+      }
+      return updated;
+    });
   };
 
   if (!profile) {
@@ -309,6 +327,26 @@ function ChatContent() {
               </div>
             </div>
           ))}
+          {suggestions.length > 0 && !streaming && (
+            <div className="flex flex-col gap-2 pt-2">
+              {suggestions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendMessage(q)}
+                  className="rounded-xl px-4 py-2.5 text-left text-sm transition"
+                  style={{
+                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-surface)',
+                    color: 'var(--accent-primary)',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-surface)'; }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>

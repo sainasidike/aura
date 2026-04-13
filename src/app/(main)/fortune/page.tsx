@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { getProfiles, type StoredProfile } from "@/lib/storage";
 import PersonSelector from "@/components/ui/PersonSelector";
 import Link from "next/link";
@@ -15,11 +15,11 @@ const PERIODS = [
 ];
 
 const CATEGORIES = [
-  { key: "love", marker: "LOVE", label: "爱情", color: "#e8668a", icon: "♥", gradient: "linear-gradient(135deg, rgba(232,102,138,0.08), rgba(232,102,138,0.02))" },
-  { key: "career", marker: "CAREER", label: "事业", color: "#5b8def", icon: "◆", gradient: "linear-gradient(135deg, rgba(91,141,239,0.08), rgba(91,141,239,0.02))" },
-  { key: "health", marker: "HEALTH", label: "健康", color: "#4bc9a0", icon: "✦", gradient: "linear-gradient(135deg, rgba(75,201,160,0.08), rgba(75,201,160,0.02))" },
-  { key: "study", marker: "STUDY", label: "学习", color: "#f0b429", icon: "◈", gradient: "linear-gradient(135deg, rgba(240,180,41,0.08), rgba(240,180,41,0.02))" },
-  { key: "social", marker: "SOCIAL", label: "人际", color: "#9b6cb8", icon: "✧", gradient: "linear-gradient(135deg, rgba(155,108,184,0.08), rgba(155,108,184,0.02))" },
+  { key: "love", marker: "LOVE", label: "爱情", color: "#e8668a", icon: "♥", gradient: "linear-gradient(135deg, rgba(232,102,138,0.10), rgba(232,102,138,0.03))" },
+  { key: "career", marker: "CAREER", label: "事业", color: "#5b8def", icon: "◆", gradient: "linear-gradient(135deg, rgba(91,141,239,0.10), rgba(91,141,239,0.03))" },
+  { key: "health", marker: "HEALTH", label: "健康", color: "#4bc9a0", icon: "✦", gradient: "linear-gradient(135deg, rgba(75,201,160,0.10), rgba(75,201,160,0.03))" },
+  { key: "study", marker: "STUDY", label: "学习", color: "#f0b429", icon: "◈", gradient: "linear-gradient(135deg, rgba(240,180,41,0.10), rgba(240,180,41,0.03))" },
+  { key: "social", marker: "SOCIAL", label: "人际", color: "#9b6cb8", icon: "✧", gradient: "linear-gradient(135deg, rgba(155,108,184,0.10), rgba(155,108,184,0.03))" },
 ];
 
 interface FortuneData {
@@ -30,10 +30,10 @@ interface FortuneData {
 }
 
 const NATURE_STYLE: Record<string, { bg: string; text: string }> = {
-  "和谐": { bg: "rgba(75,201,160,0.15)", text: "#2da89e" },
-  "紧张": { bg: "rgba(232,93,93,0.15)", text: "#e85d5d" },
-  "融合": { bg: "rgba(123,108,184,0.15)", text: "#7b6cb8" },
-  "对立": { bg: "rgba(232,138,102,0.15)", text: "#e88a66" },
+  "和谐": { bg: "rgba(75,201,160,0.12)", text: "#2da89e" },
+  "紧张": { bg: "rgba(232,93,93,0.12)", text: "#e85d5d" },
+  "融合": { bg: "rgba(123,108,184,0.12)", text: "#7b6cb8" },
+  "对立": { bg: "rgba(232,138,102,0.12)", text: "#e88a66" },
 };
 
 function parseInterpretations(text: string): Record<string, string> {
@@ -66,18 +66,18 @@ function InterpretationText({ text }: { text: string }) {
           return <h4 key={i} className="mt-3 text-[0.8rem] font-bold" style={{ color: "var(--text-primary)" }}>{trimmed.replace(/\*\*/g, "")}</h4>;
         }
         if (trimmed.startsWith("📌")) {
-          return <div key={i} className="mt-3 rounded-lg px-3 py-2" style={{ background: "rgba(123,108,184,0.06)", borderLeft: "3px solid var(--accent-primary)" }}><span className="text-xs font-bold" style={{ color: "var(--accent-primary)" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
+          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(123,108,184,0.06)", borderLeft: "3px solid var(--accent-primary)" }}><span className="text-xs font-bold" style={{ color: "var(--accent-primary)" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
         }
         if (trimmed.startsWith("💡")) {
-          return <div key={i} className="mt-3 rounded-lg px-3 py-2" style={{ background: "rgba(75,201,160,0.06)", borderLeft: "3px solid #4bc9a0" }}><span className="text-xs font-bold" style={{ color: "#4bc9a0" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
+          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(75,201,160,0.06)", borderLeft: "3px solid #4bc9a0" }}><span className="text-xs font-bold" style={{ color: "#4bc9a0" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
         }
         if (trimmed.startsWith("⚠️")) {
-          return <div key={i} className="mt-3 rounded-lg px-3 py-2" style={{ background: "rgba(232,93,93,0.06)", borderLeft: "3px solid #e85d5d" }}><span className="text-xs font-bold" style={{ color: "#e85d5d" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
+          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(232,93,93,0.06)", borderLeft: "3px solid #e85d5d" }}><span className="text-xs font-bold" style={{ color: "#e85d5d" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
         }
         if (trimmed.startsWith("- ")) {
           return (
             <div key={i} className="flex gap-2 pl-3">
-              <span className="mt-0.5 text-[0.6rem]" style={{ color: "var(--text-tertiary)" }}>•</span>
+              <span className="mt-1 text-[0.55rem]" style={{ color: "var(--accent-primary-light)" }}>●</span>
               <p className="flex-1 text-[0.8rem] leading-6" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}>{trimmed.slice(2)}</p>
             </div>
           );
@@ -239,12 +239,13 @@ export default function FortunePage() {
 
   if (!activePerson) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-4 gap-4">
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-4 gap-5">
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl text-3xl" style={{ background: 'var(--accent-primary-dim)' }}>☽</div>
         <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>请先添加个人档案</p>
         <Link
           href="/profile"
           className="rounded-full px-6 py-2.5 text-sm font-semibold text-white"
-          style={{ background: "var(--gradient-primary)" }}
+          style={{ background: "var(--gradient-primary)", boxShadow: "0 4px 16px rgba(123,108,184,0.25)" }}
         >
           创建档案
         </Link>
@@ -253,22 +254,25 @@ export default function FortunePage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col px-6 pb-24 pt-4">
+    <div className="flex flex-1 flex-col px-5 pb-24 pt-4">
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-light gradient-text" style={{ fontFamily: "var(--font-display)" }}>
           ☽ 运势解读
         </h1>
-        <div className="flex items-center gap-2">
-          <motion.button
-            onClick={() => router.push("/profile")}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
-            style={{ background: "var(--bg-base)", border: "1px solid var(--border-subtle)", color: "var(--text-tertiary)" }}
-            whileTap={{ scale: 0.9 }}
-          >
-            👤
-          </motion.button>
-        </div>
+        <motion.button
+          onClick={() => router.push("/profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-xs"
+          style={{
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-tertiary)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+          whileTap={{ scale: 0.9 }}
+        >
+          👤
+        </motion.button>
       </div>
 
       {/* Person selector */}
@@ -292,6 +296,7 @@ export default function FortunePage() {
             style={{
               background: period === p.key ? "var(--gradient-primary)" : "transparent",
               color: period === p.key ? "white" : "var(--text-tertiary)",
+              boxShadow: period === p.key ? "0 2px 8px rgba(123,108,184,0.20)" : "none",
             }}
             whileTap={{ scale: 0.95 }}
           >
@@ -301,38 +306,54 @@ export default function FortunePage() {
       </div>
 
       {/* Date selector (daily mode) */}
-      {period === "daily" && (
-        <div className="mb-5 flex gap-1.5">
-          {weekDates.map((d, i) => {
-            const isToday = d.toDateString() === now.toDateString();
-            const isSelected = d.toDateString() === selectedDate.toDateString();
-            return (
-              <motion.button
-                key={i}
-                onClick={() => setSelectedDate(d)}
-                className="flex flex-1 flex-col items-center gap-1 rounded-xl py-2"
-                style={{
-                  background: isSelected ? "var(--gradient-primary)" : "var(--bg-surface)",
-                  border: `1px solid ${isSelected ? "transparent" : "var(--border-subtle)"}`,
-                }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <span className="text-[0.6rem]" style={{ color: isSelected ? "rgba(255,255,255,0.7)" : "var(--text-tertiary)" }}>{dayNames[i]}</span>
-                <span className="text-sm font-semibold" style={{ color: isSelected ? "white" : "var(--text-primary)" }}>{d.getDate()}</span>
-                {isToday && !isSelected && <div className="h-1 w-1 rounded-full" style={{ background: "var(--accent-primary)" }} />}
-              </motion.button>
-            );
-          })}
-        </div>
-      )}
+      <AnimatePresence>
+        {period === "daily" && (
+          <motion.div
+            className="mb-5 flex gap-1.5"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {weekDates.map((d, i) => {
+              const isToday = d.toDateString() === now.toDateString();
+              const isSelected = d.toDateString() === selectedDate.toDateString();
+              return (
+                <motion.button
+                  key={i}
+                  onClick={() => setSelectedDate(d)}
+                  className="flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5"
+                  style={{
+                    background: isSelected ? "var(--gradient-primary)" : "var(--bg-surface)",
+                    border: `1px solid ${isSelected ? "transparent" : "var(--border-subtle)"}`,
+                    boxShadow: isSelected ? "0 4px 12px rgba(123,108,184,0.20)" : "none",
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <span className="text-[0.6rem] font-medium" style={{ color: isSelected ? "rgba(255,255,255,0.7)" : "var(--text-tertiary)" }}>{dayNames[i]}</span>
+                  <span className="text-sm font-semibold" style={{ color: isSelected ? "white" : "var(--text-primary)" }}>{d.getDate()}</span>
+                  {isToday && !isSelected && <div className="h-1 w-1 rounded-full" style={{ background: "var(--accent-primary)" }} />}
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Date label */}
       <div className="mb-4 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{dateLabel}</div>
 
       {/* Loading */}
       {loading && (
-        <motion.div className="flex flex-1 items-center justify-center py-20" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }}>
-          <span className="text-sm gradient-text">正在计算运势...</span>
+        <motion.div
+          className="flex flex-1 flex-col items-center justify-center gap-3 py-20"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <div className="animate-breathe">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-lg" style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>☽</div>
+          </div>
+          <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>正在计算运势...</span>
         </motion.div>
       )}
 
@@ -340,9 +361,16 @@ export default function FortunePage() {
       {!loading && fortune && (
         <div className="space-y-5">
           {/* Overall score + bar chart */}
-          <div
+          <motion.div
             className="flex items-center gap-6 rounded-2xl p-5"
-            style={{ background: "var(--gradient-card)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)" }}
+            style={{
+              background: "var(--gradient-card)",
+              border: "1px solid var(--border-subtle)",
+              boxShadow: "var(--shadow-md)",
+            }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
           >
             <div className="flex flex-col items-center">
               <motion.span
@@ -356,24 +384,24 @@ export default function FortunePage() {
               <span className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>综合分</span>
             </div>
             <div className="flex flex-1 items-end justify-around gap-2">
-              {CATEGORIES.map((cat) => {
+              {CATEGORIES.map((cat, idx) => {
                 const score = fortune.categories[cat.key]?.score ?? 50;
                 return (
                   <div key={cat.key} className="flex flex-col items-center gap-1">
-                    <span className="text-[0.6rem] font-semibold" style={{ color: cat.color }}>{score}</span>
+                    <span className="text-[0.6rem] font-bold" style={{ color: cat.color }}>{score}</span>
                     <motion.div
-                      className="w-6 rounded-t-md"
-                      style={{ background: cat.color, opacity: 0.8 }}
+                      className="w-7 rounded-md"
+                      style={{ background: `linear-gradient(180deg, ${cat.color}, ${cat.color}88)` }}
                       initial={{ height: 0 }}
                       animate={{ height: (score / 100) * 60 }}
-                      transition={{ duration: 0.5, delay: 0.1 }}
+                      transition={{ duration: 0.6, delay: 0.1 + idx * 0.06, ease: [0.16, 1, 0.3, 1] }}
                     />
-                    <span className="text-[0.55rem]" style={{ color: "var(--text-tertiary)" }}>{cat.label}</span>
+                    <span className="text-[0.55rem] font-medium" style={{ color: "var(--text-tertiary)" }}>{cat.label}</span>
                   </div>
                 );
               })}
             </div>
-          </div>
+          </motion.div>
 
           {/* Category detail cards */}
           {CATEGORIES.map((cat, idx) => {
@@ -386,16 +414,25 @@ export default function FortunePage() {
             return (
               <motion.div
                 key={cat.key}
-                className="rounded-2xl overflow-hidden"
-                style={{ border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-sm)" }}
-                initial={{ opacity: 0, y: 20 }}
+                className="overflow-hidden rounded-2xl"
+                style={{
+                  background: "var(--bg-base)",
+                  border: "1px solid var(--border-subtle)",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.06 }}
+                transition={{ delay: idx * 0.06, duration: 0.35 }}
               >
-                <div className="flex items-center gap-3 px-4 py-3" style={{ background: cat.gradient }}>
-                  <span style={{ color: cat.color, fontSize: "18px" }}>{cat.icon}</span>
+                <div className="flex items-center gap-3 px-4 py-3.5" style={{ background: cat.gradient }}>
+                  <div
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
+                    style={{ background: `${cat.color}18`, color: cat.color }}
+                  >
+                    {cat.icon}
+                  </div>
                   <span className="flex-1 text-sm font-bold" style={{ color: "var(--text-primary)" }}>{cat.label}运势</span>
-                  <div className="flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: `${cat.color}15` }}>
+                  <div className="flex items-center gap-1 rounded-full px-3 py-1" style={{ background: `${cat.color}12` }}>
                     <span className="text-sm font-bold" style={{ color: cat.color }}>{data.score}</span>
                     <span className="text-[0.6rem]" style={{ color: cat.color, opacity: 0.7 }}>分</span>
                   </div>
@@ -403,16 +440,16 @@ export default function FortunePage() {
 
                 {data.aspects && data.aspects.length > 0 && (
                   <div className="px-4 pt-3">
-                    <div className="mb-2 text-[0.65rem] font-semibold" style={{ color: "var(--text-tertiary)" }}>行运相位影响</div>
+                    <div className="mb-2 text-[0.65rem] font-semibold tracking-wide" style={{ color: "var(--text-tertiary)" }}>行运相位影响</div>
                     <div className="flex flex-wrap gap-1.5">
                       {data.aspects.map((asp, i) => {
-                        const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.1)", text: "#888" };
+                        const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.08)", text: "#888" };
                         return (
                           <span key={i} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.6rem] font-medium" style={{ background: ns.bg, color: ns.text }}>
                             <span>{asp.transit}</span>
                             <span className="font-bold">{asp.type}</span>
                             <span>{asp.natal}</span>
-                            <span className="opacity-60">{asp.orb}°</span>
+                            <span className="opacity-50">{asp.orb}°</span>
                           </span>
                         );
                       })}
@@ -424,14 +461,12 @@ export default function FortunePage() {
                   {hasContent ? (
                     <InterpretationText text={interp} />
                   ) : isWaiting ? (
-                    <motion.div
-                      className="flex items-center gap-2 rounded-xl py-4 px-3"
+                    <div
+                      className="flex items-center gap-2 rounded-xl py-4 px-3 animate-shimmer"
                       style={{ background: "rgba(123,108,184,0.04)" }}
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
                     >
                       <span className="text-xs" style={{ color: "var(--accent-primary)" }}>✨ AI 正在生成{cat.label}运势解读...</span>
-                    </motion.div>
+                    </div>
                   ) : null}
                 </div>
               </motion.div>
@@ -439,7 +474,7 @@ export default function FortunePage() {
           })}
 
           {interpretDone && (
-            <motion.p className="text-center text-[0.65rem] py-2" style={{ color: "var(--text-tertiary)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+            <motion.p className="text-center text-[0.65rem] py-3" style={{ color: "var(--text-tertiary)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
               以上解读基于占星学和命理学传统，仅供参考和娱乐
             </motion.p>
           )}
@@ -447,9 +482,14 @@ export default function FortunePage() {
       )}
 
       {!loading && !fortune && persons.length > 0 && (
-        <div className="flex flex-1 flex-col items-center justify-center py-20">
-          <p className="mb-3 text-sm" style={{ color: "var(--text-tertiary)" }}>运势数据加载失败</p>
-          <motion.button onClick={fetchFortune} className="rounded-full px-5 py-2 text-xs font-semibold text-white" style={{ background: "var(--gradient-primary)" }} whileTap={{ scale: 0.95 }}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20">
+          <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>运势数据加载失败</p>
+          <motion.button
+            onClick={fetchFortune}
+            className="rounded-full px-6 py-2.5 text-xs font-semibold text-white"
+            style={{ background: "var(--gradient-primary)", boxShadow: "0 4px 16px rgba(123,108,184,0.25)" }}
+            whileTap={{ scale: 0.95 }}
+          >
             重试
           </motion.button>
         </div>

@@ -8,7 +8,7 @@ import { getProfiles, addProfile, deleteProfile, type StoredProfile } from '@/li
 
 export default function ProfilePage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>加载中...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}><span className="animate-breathe">加载中...</span></div>}>
       <ProfileContent />
     </Suspense>
   );
@@ -29,9 +29,7 @@ function ProfileContent() {
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 根据年月计算当月天数
   const daysInMonth = new Date(form.year, form.month, 0).getDate();
-  // 如果当前选择的日超出该月天数，自动修正
   useEffect(() => {
     if (form.day > daysInMonth) {
       setForm(prev => ({ ...prev, day: daysInMonth }));
@@ -41,7 +39,6 @@ function ProfileContent() {
   useEffect(() => {
     const ps = getProfiles();
     setProfiles(ps);
-    // 如果没有档案或从运势页点击「添加」，自动展开表单
     if (ps.length === 0 || searchParams.get('showForm') === 'true') setShowForm(true);
   }, [searchParams]);
 
@@ -64,7 +61,6 @@ function ProfileContent() {
       timezone: cityData?.timezone ?? 'Asia/Shanghai',
     });
     setLoading(false);
-    // 创建后自动跳转到运势页
     router.push('/fortune');
   };
 
@@ -75,47 +71,56 @@ function ProfileContent() {
   };
 
   const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-surface)',
-    borderColor: 'var(--border-subtle)',
+    background: 'var(--bg-base)',
+    borderColor: 'var(--border-default)',
     color: 'var(--text-primary)',
   };
 
   return (
-    <div className="min-h-screen px-4 py-8 pb-24">
+    <div className="min-h-screen px-4 py-6 pb-24">
       <div className="mx-auto max-w-lg">
+        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <Link
             href="/"
-            className="text-sm hover:opacity-70 transition"
-            style={{ color: 'var(--text-tertiary)' }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-sm transition"
+            style={{ color: 'var(--text-tertiary)', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
           >
-            &larr; 返回
+            ←
           </Link>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
             个人档案
           </h1>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="rounded-lg px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 transition"
-            style={{ background: 'var(--gradient-primary)' }}
+            className="rounded-full px-4 py-2 text-xs font-semibold text-white transition"
+            style={{
+              background: showForm ? 'var(--text-tertiary)' : 'var(--gradient-primary)',
+              boxShadow: showForm ? 'none' : '0 2px 10px rgba(123,108,184,0.20)',
+            }}
           >
             {showForm ? '取消' : '+ 新建'}
           </button>
         </div>
 
+        {/* Create form */}
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-8 rounded-2xl border p-6 backdrop-blur space-y-4"
-            style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}
+            className="animate-fadeInUp mb-8 rounded-2xl p-6 space-y-4"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              boxShadow: 'var(--shadow-md)',
+            }}
           >
             <div>
-              <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>姓名/备注</label>
+              <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>姓名/备注</label>
               <input
                 type="text" required
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none"
+                className="w-full rounded-xl border px-4 py-2.5 text-sm transition"
                 style={inputStyle}
                 placeholder="例：张三"
               />
@@ -123,11 +128,11 @@ function ProfileContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>性别</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>性别</label>
                 <select
                   value={form.gender}
                   onChange={e => setForm({ ...form, gender: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-4 py-2.5 text-sm transition"
                   style={inputStyle}
                 >
                   <option value="男">男</option>
@@ -135,7 +140,7 @@ function ProfileContent() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>出生城市</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>出生城市</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -143,14 +148,14 @@ function ProfileContent() {
                     onChange={e => { setCitySearch(e.target.value); setShowCityDropdown(true); }}
                     onFocus={() => { setShowCityDropdown(true); setCitySearch(''); }}
                     onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                    placeholder="搜索城市名或省份..."
-                    className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                    placeholder="搜索城市..."
+                    className="w-full rounded-xl border px-4 py-2.5 text-sm transition"
                     style={inputStyle}
                   />
                   {showCityDropdown && (
                     <div
-                      className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border shadow-lg"
-                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}
+                      className="absolute z-10 mt-1.5 max-h-48 w-full overflow-y-auto rounded-xl border shadow-lg"
+                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)', boxShadow: 'var(--shadow-lg)' }}
                     >
                       {cityResults.length > 0 ? cityResults.map(c => (
                         <button
@@ -158,17 +163,17 @@ function ProfileContent() {
                           type="button"
                           onMouseDown={e => e.preventDefault()}
                           onClick={() => { setForm({ ...form, city: c.name }); setCitySearch(''); setShowCityDropdown(false); }}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition"
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition"
                           style={{ color: 'var(--text-primary)' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)'; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                         >
                           <span>{c.name}</span>
                           <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{c.province}</span>
                         </button>
                       )) : (
-                        <div className="px-3 py-3 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          未找到「{citySearch}」，请尝试省份名或其他城市
+                        <div className="px-4 py-3 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          未找到「{citySearch}」
                         </div>
                       )}
                     </div>
@@ -179,17 +184,17 @@ function ProfileContent() {
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>年</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>年</label>
                 <input type="number" min={1900} max={2030}
                   value={form.year} onChange={e => setForm({ ...form, year: +e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm transition"
                   style={inputStyle}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>月</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>月</label>
                 <select value={form.month} onChange={e => setForm({ ...form, month: +e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm transition"
                   style={inputStyle}
                 >
                   {Array.from({ length: 12 }, (_, i) => (
@@ -198,9 +203,9 @@ function ProfileContent() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>日</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>日</label>
                 <select value={form.day} onChange={e => setForm({ ...form, day: +e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm transition"
                   style={inputStyle}
                 >
                   {Array.from({ length: daysInMonth }, (_, i) => (
@@ -212,9 +217,9 @@ function ProfileContent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>时</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>时</label>
                 <select value={form.hour} onChange={e => setForm({ ...form, hour: +e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm transition"
                   style={inputStyle}
                 >
                   {Array.from({ length: 24 }, (_, i) => (
@@ -223,9 +228,9 @@ function ProfileContent() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm" style={{ color: 'var(--text-secondary)' }}>分</label>
+                <label className="mb-1.5 block text-xs font-medium tracking-wide" style={{ color: 'var(--text-tertiary)' }}>分</label>
                 <select value={form.minute} onChange={e => setForm({ ...form, minute: +e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 focus:border-accent-primary focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm transition"
                   style={inputStyle}
                 >
                   {Array.from({ length: 60 }, (_, i) => (
@@ -237,8 +242,11 @@ function ProfileContent() {
 
             <button
               type="submit" disabled={loading}
-              className="w-full rounded-lg py-2.5 font-medium text-white hover:opacity-90 transition disabled:opacity-50"
-              style={{ background: 'var(--gradient-primary)' }}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition disabled:opacity-50"
+              style={{
+                background: 'var(--gradient-primary)',
+                boxShadow: '0 4px 16px rgba(123,108,184,0.25)',
+              }}
             >
               {loading ? '创建中...' : '创建档案'}
             </button>
@@ -246,46 +254,70 @@ function ProfileContent() {
         )}
 
         {profiles.length === 0 && !showForm && (
-          <div className="text-center py-16" style={{ color: 'var(--text-tertiary)' }}>
-            <p className="text-lg mb-2">还没有档案</p>
-            <p className="text-sm">点击右上角「新建」开始</p>
+          <div className="flex flex-col items-center gap-3 py-20 animate-fadeIn">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl text-2xl" style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>👤</div>
+            <p className="text-base font-medium" style={{ color: 'var(--text-secondary)' }}>还没有档案</p>
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>点击右上角「新建」开始</p>
           </div>
         )}
 
-        <div className="space-y-3">
+        {/* Profile cards */}
+        <div className="stagger-children space-y-3">
           {profiles.map(p => (
             <div
               key={p.id}
-              className="rounded-2xl border p-5 backdrop-blur"
-              style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}
+              className="rounded-2xl p-5"
+              style={{
+                background: 'var(--bg-base)',
+                border: '1px solid var(--border-subtle)',
+                boxShadow: 'var(--shadow-card)',
+              }}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</h3>
-                  <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+                  style={{ background: 'var(--gradient-primary)' }}
+                >
+                  {p.name[0]}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{p.name}</h3>
+                    <button
+                      onClick={() => handleDelete(p.id, p.name)}
+                      className="rounded-lg px-2 py-1 text-xs transition"
+                      style={{ color: 'var(--error)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(192,80,96,0.08)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <p className="mt-0.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                     {p.year}年{p.month}月{p.day}日 {String(p.hour).padStart(2, '0')}:{String(p.minute).padStart(2, '0')} · {p.city} · {p.gender}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleDelete(p.id, p.name)}
-                  className="text-xs hover:opacity-80"
-                  style={{ color: 'var(--error)' }}
-                >
-                  删除
-                </button>
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3.5 flex gap-2 pl-14">
                 <Link
                   href={`/chart?profileId=${p.id}`}
-                  className="rounded-lg px-3 py-1 text-sm transition hover:opacity-80"
-                  style={{ background: 'var(--accent-primary-dim)', color: 'var(--text-primary)' }}
+                  className="rounded-full px-4 py-1.5 text-xs font-medium transition"
+                  style={{
+                    background: 'var(--accent-primary-dim)',
+                    color: 'var(--accent-primary)',
+                    border: '1px solid rgba(123,108,184,0.12)',
+                  }}
                 >
                   排盘分析
                 </Link>
                 <Link
                   href={`/chat?profileId=${p.id}`}
-                  className="rounded-lg px-3 py-1 text-sm transition hover:opacity-80"
-                  style={{ background: 'var(--accent-primary-dim)', color: 'var(--text-primary)' }}
+                  className="rounded-full px-4 py-1.5 text-xs font-medium transition"
+                  style={{
+                    background: 'var(--accent-secondary-dim)',
+                    color: 'var(--accent-secondary)',
+                    border: '1px solid rgba(58,191,182,0.12)',
+                  }}
                 >
                   AI 对话
                 </Link>

@@ -384,3 +384,433 @@ export function AspectGrid({ chart }: { chart: AstrologyChart }) {
     </div>
   );
 }
+
+/* ═══════════════════════════════════════ */
+/* Transit Overlay Chart (双层盘)          */
+/* ═══════════════════════════════════════ */
+
+export function TransitOverlaySVG({ natalChart, transitChart }: { natalChart: AstrologyChart; transitChart: AstrologyChart }) {
+  const { planets: natalPlanets, houses, aspects: natalAspects, ascendant, midheaven } = natalChart;
+  const { planets: transitPlanets } = transitChart;
+  const SIZE = 380;
+  const CX = SIZE / 2;
+  const CY = SIZE / 2;
+  const R_OUTER = 170;
+  const R_ZODIAC = 150;
+  const R_HOUSE_OUTER = 148;
+  const R_HOUSE_INNER = 70;
+  const R_NATAL = 120;
+  const R_TRANSIT = 100;
+  const R_HOUSE_NUM = 90;
+
+  const toAngle = (lon: number) => lonToChartAngle(lon, ascendant);
+  const toXY = (r: number, lon: number) => polarToXY(CX, CY, r, toAngle(lon));
+
+  const signSegments = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const startLon = i * 30;
+      const endLon = (i + 1) * 30;
+      const midLon = startLon + 15;
+      const startAngle = toAngle(startLon);
+      const endAngle = toAngle(endLon);
+      const p1 = polarToXY(CX, CY, R_OUTER, startAngle);
+      const p2 = polarToXY(CX, CY, R_OUTER, endAngle);
+      const p3 = polarToXY(CX, CY, R_ZODIAC, endAngle);
+      const p4 = polarToXY(CX, CY, R_ZODIAC, startAngle);
+      const path = `M ${p1.x} ${p1.y} A ${R_OUTER} ${R_OUTER} 0 0 0 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${R_ZODIAC} ${R_ZODIAC} 0 0 1 ${p4.x} ${p4.y} Z`;
+      const glyphPos = polarToXY(CX, CY, (R_OUTER + R_ZODIAC) / 2, toAngle(midLon));
+      return { i, path, glyphPos, color: SIGN_ELEMENT_COLORS[i], glyph: SIGN_GLYPHS[i] };
+    });
+  }, [ascendant]);
+
+  const houseLines = houses.map(h => {
+    const angle = toAngle(h.longitude);
+    const pOuter = polarToXY(CX, CY, R_HOUSE_OUTER, angle);
+    const pInner = polarToXY(CX, CY, R_HOUSE_INNER, angle);
+    const isAngular = [1, 4, 7, 10].includes(h.number);
+    return { ...h, pOuter, pInner, isAngular };
+  });
+
+  const houseNumbers = houses.map((h, idx) => {
+    const nextIdx = (idx + 1) % 12;
+    const lon1 = h.longitude;
+    const lon2 = houses[nextIdx].longitude;
+    let midLon = (lon1 + lon2) / 2;
+    if (Math.abs(lon2 - lon1) > 180) midLon = normalize(midLon + 180);
+    const pos = polarToXY(CX, CY, R_HOUSE_NUM, toAngle(midLon));
+    return { number: h.number, ...pos };
+  });
+
+  // Natal planets (inner ring)
+  const natalPositions = useMemo(() => {
+    const sorted = [...natalPlanets].map(p => ({ ...p, chartAngle: toAngle(p.longitude) })).sort((a, b) => a.chartAngle - b.chartAngle);
+    for (let pass = 0; pass < 5; pass++) {
+      for (let i = 0; i < sorted.length; i++) {
+        const next = sorted[(i + 1) % sorted.length];
+        let diff = next.chartAngle - sorted[i].chartAngle;
+        if (diff < 0) diff += 360;
+        if (diff < 8 && diff > 0) {
+          sorted[i].chartAngle = normalize(sorted[i].chartAngle - (8 - diff) / 2);
+          next.chartAngle = normalize(next.chartAngle + (8 - diff) / 2);
+        }
+      }
+    }
+    return sorted.map(p => ({
+      ...p,
+      pos: polarToXY(CX, CY, R_NATAL, p.chartAngle),
+    }));
+  }, [natalPlanets, ascendant]);
+
+  // Transit planets (outer ring, between zodiac and houses)
+  const transitPositions = useMemo(() => {
+    const sorted = [...transitPlanets].map(p => ({ ...p, chartAngle: toAngle(p.longitude) })).sort((a, b) => a.chartAngle - b.chartAngle);
+    for (let pass = 0; pass < 5; pass++) {
+      for (let i = 0; i < sorted.length; i++) {
+        const next = sorted[(i + 1) % sorted.length];
+        let diff = next.chartAngle - sorted[i].chartAngle;
+        if (diff < 0) diff += 360;
+        if (diff < 8 && diff > 0) {
+          sorted[i].chartAngle = normalize(sorted[i].chartAngle - (8 - diff) / 2);
+          next.chartAngle = normalize(next.chartAngle + (8 - diff) / 2);
+        }
+      }
+    }
+    return sorted.map(p => ({
+      ...p,
+      pos: polarToXY(CX, CY, R_TRANSIT, p.chartAngle),
+    }));
+  }, [transitPlanets, ascendant]);
+
+  const ascPos = toXY(R_OUTER + 14, ascendant);
+  const mcPos = toXY(R_OUTER + 14, midheaven);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-center">
+        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ maxWidth: '100%', height: 'auto' }}>
+          <circle cx={CX} cy={CY} r={R_OUTER + 2} fill="var(--bg-surface)" />
+          {signSegments.map(s => (
+            <g key={s.i}>
+              <path d={s.path} fill={s.color} opacity={0.12} stroke={s.color} strokeWidth={0.5} strokeOpacity={0.3} />
+              <text x={s.glyphPos.x} y={s.glyphPos.y} textAnchor="middle" dominantBaseline="central" fontSize={13} fill={s.color} fontWeight={600}>{s.glyph}</text>
+            </g>
+          ))}
+          <circle cx={CX} cy={CY} r={R_OUTER} fill="none" stroke="var(--border-default)" strokeWidth={0.5} />
+          <circle cx={CX} cy={CY} r={R_ZODIAC} fill="none" stroke="var(--border-default)" strokeWidth={0.5} />
+          <circle cx={CX} cy={CY} r={R_HOUSE_INNER} fill="var(--bg-base)" stroke="var(--border-subtle)" strokeWidth={0.5} />
+          {/* Divider ring between natal and transit */}
+          <circle cx={CX} cy={CY} r={110} fill="none" stroke="var(--border-subtle)" strokeWidth={0.3} strokeDasharray="2,3" />
+          {Array.from({ length: 12 }, (_, i) => {
+            const angle = toAngle(i * 30);
+            const sp1 = polarToXY(CX, CY, R_OUTER, angle);
+            const sp2 = polarToXY(CX, CY, R_ZODIAC, angle);
+            return <line key={`sign-${i}`} x1={sp1.x} y1={sp1.y} x2={sp2.x} y2={sp2.y} stroke="var(--border-default)" strokeWidth={0.5} />;
+          })}
+          {houseLines.map(h => (
+            <line key={`house-${h.number}`} x1={h.pOuter.x} y1={h.pOuter.y} x2={h.pInner.x} y2={h.pInner.y}
+              stroke={h.isAngular ? 'var(--text-secondary)' : 'var(--border-default)'}
+              strokeWidth={h.isAngular ? 1.2 : 0.5} strokeDasharray={h.isAngular ? undefined : '3,3'} />
+          ))}
+          {houseNumbers.map(h => (
+            <text key={`hnum-${h.number}`} x={h.x} y={h.y} textAnchor="middle" dominantBaseline="central" fontSize={8} fill="var(--text-tertiary)">{h.number}</text>
+          ))}
+          {/* Natal planets (inner) */}
+          {natalPositions.map(p => (
+            <g key={`natal-${p.name}`}>
+              <text x={p.pos.x} y={p.pos.y} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={600} fill={PLANET_COLORS[p.name] || '#888'}>{PLANET_SHORT[p.name] || p.name[0]}</text>
+            </g>
+          ))}
+          {/* Transit planets (outer, green-tinted) */}
+          {transitPositions.map(p => (
+            <g key={`transit-${p.name}`}>
+              <circle cx={polarToXY(CX, CY, R_ZODIAC + 2, toAngle(p.longitude)).x} cy={polarToXY(CX, CY, R_ZODIAC + 2, toAngle(p.longitude)).y} r={2} fill="#3abfb6" />
+              <text x={p.pos.x} y={p.pos.y} textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} fill="#3abfb6">{PLANET_SHORT[p.name] || p.name[0]}</text>
+            </g>
+          ))}
+          <text x={ascPos.x} y={ascPos.y} textAnchor="middle" dominantBaseline="central" fontSize={9} fill="var(--accent-primary)" fontWeight={700}>升</text>
+          <text x={mcPos.x} y={mcPos.y} textAnchor="middle" dominantBaseline="central" fontSize={9} fill="var(--accent-primary)" fontWeight={700}>中</text>
+        </svg>
+      </div>
+      <div className="flex justify-center gap-3">
+        <span className="rounded-full px-2.5 py-1 text-[0.65rem] font-medium" style={{ background: 'rgba(123,108,184,0.08)', color: 'var(--accent-primary)' }}>● 本命</span>
+        <span className="rounded-full px-2.5 py-1 text-[0.65rem] font-medium" style={{ background: 'rgba(58,191,182,0.08)', color: '#3abfb6' }}>● 行运</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* Transit Aspects List                    */
+/* ═══════════════════════════════════════ */
+
+const ASPECT_TYPE_COLORS: Record<string, { color: string; bg: string; label: string }> = {
+  '合相': { color: '#8060b0', bg: 'rgba(128,96,176,0.1)', label: '合' },
+  '六合': { color: '#40a060', bg: 'rgba(64,160,96,0.1)', label: '六合' },
+  '四分': { color: '#d04040', bg: 'rgba(208,64,64,0.1)', label: '刑' },
+  '三合': { color: '#4080d0', bg: 'rgba(64,128,208,0.1)', label: '拱' },
+  '对冲': { color: '#d08030', bg: 'rgba(208,128,48,0.1)', label: '冲' },
+};
+
+export function TransitAspectsList({ crossAspects, transitChart }: {
+  crossAspects: { planet1: string; planet2: string; type: string; angle: number; orb: number }[];
+  transitChart: AstrologyChart;
+}) {
+  const moonPlanet = transitChart.planets.find(p => p.name === '月亮');
+
+  return (
+    <div className="space-y-4">
+      {moonPlanet && (
+        <div className="rounded-lg px-3 py-1.5 text-xs font-medium text-center"
+          style={{ background: 'rgba(123,108,184,0.06)', color: 'var(--accent-primary)', border: '1px solid rgba(123,108,184,0.12)' }}>
+          今日月亮在{moonPlanet.sign}座
+        </div>
+      )}
+
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+        <div className="px-4 py-2.5 text-xs font-medium" style={{ color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border-subtle)' }}>
+          行运相位（行运行星 → 本命行星）· {crossAspects.length} 个
+        </div>
+        {crossAspects.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>暂无紧密行运相位</div>
+        ) : (
+          crossAspects.map((a, i) => {
+            const info = ASPECT_TYPE_COLORS[a.type] || ASPECT_TYPE_COLORS['合相'];
+            return (
+              <div key={`${a.planet1}-${a.planet2}-${i}`}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm"
+                style={{
+                  background: i % 2 === 0 ? 'var(--bg-base)' : 'var(--bg-surface)',
+                  borderBottom: i < crossAspects.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                }}>
+                <span className="w-12 shrink-0 text-xs font-medium" style={{ color: '#3abfb6' }}>{a.planet1}</span>
+                <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-bold"
+                  style={{ background: info.bg, color: info.color }}>
+                  {info.label}
+                </span>
+                <span className="flex-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{a.planet2}</span>
+                <span className="shrink-0 font-mono text-[0.65rem]" style={{ color: 'var(--text-tertiary)' }}>
+                  {a.orb.toFixed(1)}°
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* Return Detail Panel (日返/月返详细)      */
+/* ═══════════════════════════════════════ */
+
+const ANGULAR_HOUSES = [1, 4, 7, 10];
+const HOUSE_DOMAIN: Record<number, string> = {
+  1: '自我/外在形象', 2: '财务/价值', 3: '沟通/学习', 4: '家庭/根基',
+  5: '创造/恋爱', 6: '健康/日常', 7: '伴侣/合作', 8: '深层转化',
+  9: '远行/信仰', 10: '事业/社会', 11: '社群/愿景', 12: '灵性/隐退',
+};
+const DIGNITY_LABELS: Record<string, { text: string; good: boolean }> = {
+  '庙': { text: '庙', good: true }, '旺': { text: '旺', good: true },
+  '陷': { text: '陷', good: false }, '落': { text: '落', good: false },
+};
+const PLANET_ORDER = ['太阳', '月亮', '水星', '金星', '火星', '木星', '土星', '天王星', '海王星', '冥王星'];
+
+export function ReturnDetailPanel({ chartType, chart, returnMoment, nextReturn }: {
+  chartType: 'solar_return' | 'lunar_return';
+  chart: AstrologyChart;
+  returnMoment: { date: string; time: string; precisionArcsec: number };
+  nextReturn?: { date: string; time: string } | null;
+}) {
+  const isSolar = chartType === 'solar_return';
+  const titleIcon = isSolar ? '☉' : '☽';
+  const titleText = isSolar ? '太阳回归盘分析' : '月亮回归盘分析';
+  const periodText = isSolar ? '年度' : '本月';
+
+  const ascSignIndex = Math.floor(normalize(chart.ascendant) / 30);
+  const ascSign = SIGNS_CN[ascSignIndex] + '座';
+  const mcSignIndex = Math.floor(normalize(chart.midheaven) / 30);
+  const mcSign = SIGNS_CN[mcSignIndex] + '座';
+
+  const ascRulerName = SIGN_RULER[SIGNS_CN[ascSignIndex]];
+  const ascRuler = ascRulerName ? chart.planets.find(p => p.name === ascRulerName) : null;
+
+  const sunP = chart.planets.find(p => p.name === '太阳');
+  const moonP = chart.planets.find(p => p.name === '月亮');
+
+  const angularPlanets = chart.planets.filter(p => ANGULAR_HOUSES.includes(p.house) && p.name !== '北交点');
+
+  const tightAspects = [...chart.aspects]
+    .filter(a => a.orb < 3)
+    .sort((a, b) => a.orb - b.orb)
+    .slice(0, 8);
+
+  const retrogrades = chart.planets.filter(p => p.retrograde && p.name !== '北交点');
+
+  return (
+    <div className="space-y-4">
+      {/* Header Card */}
+      <div className="rounded-2xl p-4" style={{
+        background: isSolar ? 'linear-gradient(135deg, rgba(184,150,62,0.08), rgba(123,108,184,0.06))' : 'linear-gradient(135deg, rgba(123,108,184,0.08), rgba(58,191,182,0.06))',
+        border: `1px solid ${isSolar ? 'rgba(184,150,62,0.15)' : 'rgba(123,108,184,0.15)'}`,
+      }}>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-lg">{titleIcon}</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{titleText}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <span style={{ color: 'var(--text-tertiary)' }}>回归时刻</span>
+            <div className="mt-0.5 font-medium" style={{ color: 'var(--text-primary)' }}>
+              {returnMoment.date} {returnMoment.time}
+            </div>
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-tertiary)' }}>上升星座</span>
+            <div className="mt-0.5 font-medium" style={{ color: 'var(--accent-primary)' }}>{ascSign}</div>
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-tertiary)' }}>中天星座</span>
+            <div className="mt-0.5 font-medium" style={{ color: 'var(--text-primary)' }}>{mcSign}</div>
+          </div>
+          {ascRuler && (
+            <div>
+              <span style={{ color: 'var(--text-tertiary)' }}>{periodText}命主星</span>
+              <div className="mt-0.5 font-medium" style={{ color: 'var(--accent-secondary)' }}>
+                {ascRuler.name} {ascRuler.sign}座 {ascRuler.house}宫
+              </div>
+            </div>
+          )}
+          {isSolar && sunP && (
+            <div>
+              <span style={{ color: 'var(--text-tertiary)' }}>太阳落宫</span>
+              <div className="mt-0.5 font-medium" style={{ color: 'var(--text-primary)' }}>
+                第{sunP.house}宫 — {HOUSE_DOMAIN[sunP.house] || ''}
+              </div>
+            </div>
+          )}
+          {moonP && (
+            <div>
+              <span style={{ color: 'var(--text-tertiary)' }}>月亮位置</span>
+              <div className="mt-0.5 font-medium" style={{ color: 'var(--text-primary)' }}>
+                {moonP.sign}座 {moonP.house}宫
+              </div>
+            </div>
+          )}
+        </div>
+        {nextReturn && !isSolar && (
+          <div className="mt-3 border-t pt-2" style={{ borderColor: 'rgba(123,108,184,0.12)' }}>
+            <span className="text-[0.65rem]" style={{ color: 'var(--text-tertiary)' }}>
+              下次月返：{nextReturn.date} {nextReturn.time}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Angular Planets */}
+      {angularPlanets.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+          <h4 className="mb-3 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>角宫行星（关键影响力）</h4>
+          <div className="space-y-2">
+            {angularPlanets.map(p => (
+              <div key={p.name} className="flex items-center gap-2 text-sm">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                  style={{
+                    background: p.house === 1 ? 'rgba(123,108,184,0.12)' : p.house === 10 ? 'rgba(184,150,62,0.12)' : p.house === 7 ? 'rgba(184,108,160,0.12)' : 'rgba(58,191,182,0.12)',
+                    color: PLANET_COLORS[p.name] || '#888',
+                  }}>
+                  {PLANET_SHORT[p.name] || p.name[0]}
+                </span>
+                <div className="flex-1">
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
+                  <span className="ml-1.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    {p.sign}座 {p.degree}° · 第{p.house}宫
+                  </span>
+                  {p.retrograde && <span className="ml-1 text-[0.6rem] font-bold" style={{ color: 'var(--error)' }}>逆</span>}
+                </div>
+                <span className="text-[0.65rem]" style={{ color: 'var(--text-tertiary)' }}>
+                  {HOUSE_DOMAIN[p.house]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tight Aspects */}
+      {tightAspects.length > 0 && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+          <div className="px-4 py-2.5 text-xs font-semibold"
+            style={{ background: 'var(--bg-surface)', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border-subtle)' }}>
+            紧密相位（容许度 &lt; 3°）
+          </div>
+          {tightAspects.map((asp, i) => {
+            const info = ASPECT_TYPE_COLORS[asp.type] || ASPECT_TYPE_COLORS['合相'];
+            return (
+              <div key={`${asp.planet1}-${asp.planet2}-${asp.type}`}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm"
+                style={{
+                  background: i % 2 === 0 ? 'var(--bg-base)' : 'var(--bg-surface)',
+                  borderBottom: i < tightAspects.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                }}>
+                <span className="w-14 shrink-0 font-medium text-xs" style={{ color: 'var(--text-primary)' }}>{asp.planet1}</span>
+                <span className="shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-bold" style={{ background: info.bg, color: info.color }}>
+                  {info.label}
+                </span>
+                <span className="flex-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{asp.planet2}</span>
+                <span className="shrink-0 font-mono text-[0.65rem]" style={{ color: 'var(--text-tertiary)' }}>{asp.orb.toFixed(1)}°</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Retrograde & Dignity Tags */}
+      {(retrogrades.length > 0 || chart.planets.some(p => getDignity(p.name, p.sign) !== '')) && (
+        <div className="flex flex-wrap gap-2">
+          {retrogrades.map(p => (
+            <span key={p.name} className="rounded-full px-2.5 py-1 text-[0.65rem] font-medium"
+              style={{ background: 'rgba(232,93,93,0.08)', color: 'var(--error)', border: '1px solid rgba(232,93,93,0.15)' }}>
+              {PLANET_SHORT[p.name]} 逆行
+            </span>
+          ))}
+          {chart.planets.filter(p => getDignity(p.name, p.sign) !== '').map(p => {
+            const d = getDignity(p.name, p.sign);
+            const info = DIGNITY_LABELS[d];
+            if (!info) return null;
+            return (
+              <span key={p.name} className="rounded-full px-2.5 py-1 text-[0.65rem] font-medium"
+                style={{
+                  background: info.good ? 'rgba(45,168,158,0.08)' : 'rgba(232,169,62,0.08)',
+                  color: info.good ? 'var(--accent-secondary)' : '#c89030',
+                  border: `1px solid ${info.good ? 'rgba(45,168,158,0.15)' : 'rgba(232,169,62,0.15)'}`,
+                }}>
+                {PLANET_SHORT[p.name]} {info.text}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Planet Distribution */}
+      <div className="rounded-2xl p-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+        <h4 className="mb-3 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>行星分布</h4>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {PLANET_ORDER.map(name => {
+            const p = chart.planets.find(pl => pl.name === name);
+            if (!p) return null;
+            return (
+              <div key={name} className="flex items-center gap-1.5 text-xs">
+                <span className="w-5 shrink-0 font-semibold" style={{ color: PLANET_COLORS[name] || '#888' }}>{PLANET_SHORT[name]}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{p.sign}座</span>
+                <span className="font-mono text-[0.6rem]" style={{ color: 'var(--text-tertiary)' }}>{p.degree}°</span>
+                <span className="text-[0.6rem]" style={{ color: 'var(--text-tertiary)' }}>{p.house}宫</span>
+                {p.retrograde && <span className="text-[0.55rem] font-bold" style={{ color: 'var(--error)' }}>逆</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

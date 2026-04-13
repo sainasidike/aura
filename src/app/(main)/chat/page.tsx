@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
@@ -46,7 +46,7 @@ export default function ChatPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
-          加载中...
+          <span className="animate-breathe">加载中...</span>
         </div>
       }
     >
@@ -57,6 +57,7 @@ export default function ChatPage() {
 
 function ChatContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const paramProfileId = searchParams.get('profileId');
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
@@ -67,6 +68,14 @@ function ChatContent() {
   const [mode, setMode] = useState<ChartMode>('mixed');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [toast, setToast] = useState('');
+
+  // Astrology AI context (from astrology page "问AI" button)
+  const [astroContext, setAstroContext] = useState<{
+    chartData: Record<string, unknown>;
+    analysisType: string;
+  } | null>(null);
+  const [autoSendQuestion, setAutoSendQuestion] = useState<string | null>(null);
+  const didProcessPendingRef = useRef(false);
 
   // Selection mode
   const [selectMode, setSelectMode] = useState(false);
@@ -104,8 +113,39 @@ function ChatContent() {
     }
   }, [paramProfileId]);
 
-  // Restore conversation
+  // ─── Check for pending astrology AI question ───
   useEffect(() => {
+    // Prevent double-processing in React 18 StrictMode
+    if (didProcessPendingRef.current) return;
+    try {
+      const raw = localStorage.getItem('aura_astrology_ai_pending');
+      if (raw) {
+        didProcessPendingRef.current = true;
+        localStorage.removeItem('aura_astrology_ai_pending');
+        const pending = JSON.parse(raw);
+        if (pending.question && pending.chartData) {
+          setAstroContext({ chartData: pending.chartData, analysisType: pending.analysisType });
+          setMode('astrology');
+          setMessages([]);
+          setSuggestions([]);
+          setAutoSendQuestion(pending.question);
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }, []);
+
+  // ─── Auto-send pending question ───
+  useEffect(() => {
+    if (autoSendQuestion && !streaming) {
+      const q = autoSendQuestion;
+      setAutoSendQuestion(null);
+      sendMessage(q);
+    }
+  }, [autoSendQuestion, streaming]);
+
+  // Restore conversation (skip when astroContext is active — user came from "问AI")
+  useEffect(() => {
+    if (astroContext) return;
     if (!profileIdRef.current) return;
     try {
       const saved = localStorage.getItem(chatStorageKey(profileIdRef.current, mode));
@@ -113,7 +153,7 @@ function ChatContent() {
     } catch { setMessages([]); }
     setSuggestions([]);
     exitSelectMode();
-  }, [mode, profile]);
+  }, [mode, profile, astroContext]);
 
   // Save & scroll
   useEffect(() => {
@@ -147,6 +187,8 @@ function ChatContent() {
   };
 
   const getChartDataForMode = (): Record<string, unknown> | null => {
+    // Use astrology page context when available (transit/return analysis)
+    if (astroContext) return astroContext.chartData;
     if (!allChartData) return null;
     const base = { profile: allChartData.profile, timeInfo: allChartData.timeInfo };
     switch (mode) {
@@ -177,8 +219,14 @@ function ChatContent() {
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
           chartData: getChartDataForMode(),
           mode,
+          ...(astroContext?.analysisType ? { analysisType: astroContext.analysisType } : {}),
         }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: '请求失败' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No reader');
@@ -353,11 +401,18 @@ function ChatContent() {
   // ─── Render ───
   if (!profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center">
-          <p className="mb-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>请先创建一个档案</p>
-          <Link href="/profile" className="rounded-lg px-4 py-2 text-sm text-white" style={{ background: 'var(--accent-primary)' }}>前往档案管理</Link>
-        </div>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6">
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl text-3xl" style={{ background: 'var(--accent-primary-dim)' }}>✦</div>
+        <p className="text-center text-sm leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+          请先创建一个档案<br />开始你的命理之旅
+        </p>
+        <Link
+          href="/profile"
+          className="rounded-full px-6 py-2.5 text-sm font-medium text-white"
+          style={{ background: 'var(--gradient-primary)', boxShadow: '0 4px 16px rgba(123,108,184,0.25)' }}
+        >
+          创建档案
+        </Link>
       </div>
     );
   }
@@ -368,34 +423,50 @@ function ChatContent() {
       <div
         className="fixed left-0 right-0 top-0 px-4 pb-3 pt-3"
         style={{
-          background: 'rgba(248,247,252,0.92)',
-          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          background: 'rgba(255,255,255,0.78)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           zIndex: 50,
+          borderBottom: '1px solid rgba(123,108,184,0.05)',
         }}
       >
         <div className="mx-auto max-w-2xl">
           {selectMode ? (
             /* ── Selection header ── */
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between py-1">
               <button onClick={exitSelectMode} className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>取消</button>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>已选择 {selected.size} 条</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>已选择 {selected.size} 条</p>
               <button onClick={selectAll} className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>全选</button>
             </div>
           ) : (
             /* ── Normal header ── */
             <>
               <div className="flex items-center justify-between">
-                <p className="text-lg font-semibold" style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-display)' }}>
+                <p className="text-lg font-semibold tracking-wide" style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-display)' }}>
                   ✦ AI 占星师
                 </p>
                 {messages.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setShowShare(true)} className="rounded-lg p-1.5" style={{ color: 'var(--text-tertiary)' }} title="分享">
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => setShowShare(true)}
+                      className="rounded-lg p-2 transition-colors"
+                      style={{ color: 'var(--text-tertiary)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                      title="分享"
+                    >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
                       </svg>
                     </button>
-                    <button onClick={() => { setShowConfirm(true); }} className="rounded-lg p-1.5" style={{ color: 'var(--text-tertiary)' }} title="清除">
+                    <button
+                      onClick={() => { setShowConfirm(true); }}
+                      className="rounded-lg p-2 transition-colors"
+                      style={{ color: 'var(--text-tertiary)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(192,80,96,0.08)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                      title="清除"
+                    >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                       </svg>
@@ -405,15 +476,15 @@ function ChatContent() {
               </div>
 
               {/* Mode selector */}
-              <div className="mt-2 flex items-center gap-1">
+              <div className="mt-2.5 flex items-center gap-1.5">
                 {MODE_ORDER.map(m => (
                   <button
                     key={m}
-                    onClick={() => setMode(m)}
-                    className="rounded-full px-3 py-1 text-xs transition"
+                    onClick={() => { setAstroContext(null); setMode(m); }}
+                    className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all"
                     style={mode === m
-                      ? { background: 'var(--accent-primary)', color: '#fff', fontWeight: 500 }
-                      : { color: 'var(--text-tertiary)' }
+                      ? { background: 'var(--accent-primary)', color: '#fff', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
+                      : { color: 'var(--text-tertiary)', background: 'transparent' }
                     }
                   >
                     {MODE_LABELS[m]}
@@ -422,16 +493,20 @@ function ChatContent() {
               </div>
 
               {/* Quick topics */}
-              <div className="mt-2.5 flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+              <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-0.5">
                 {QUICK_TOPICS.map((t, i) => (
                   <button
                     key={i}
                     onClick={() => sendMessage(t.question)}
                     disabled={streaming || !allChartData}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition disabled:opacity-30"
-                    style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all disabled:opacity-30"
+                    style={{
+                      background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-subtle)',
+                    }}
                   >
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: t.color }} />
+                    <span className="inline-block h-[7px] w-[7px] rounded-full" style={{ background: t.color }} />
                     {t.label}
                   </button>
                 ))}
@@ -442,24 +517,51 @@ function ChatContent() {
       </div>
 
       {/* ─── Messages ─── */}
-      <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: selectMode ? '60px' : '140px' }}>
-        <div className="mx-auto max-w-2xl space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: selectMode ? '60px' : '148px' }}>
+        <div className="mx-auto max-w-2xl space-y-5">
+          {/* Cold start */}
           {messages.length === 0 && (
-            <div className="py-6">
-              <p className="mb-4 text-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                {allChartData ? '选择上方话题或试试以下问题' : '正在准备排盘数据...'}
-              </p>
+            <div className="py-8 animate-fadeIn">
+              {/* Welcome illustration */}
+              <div className="mb-6 flex flex-col items-center">
+                <div
+                  className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl"
+                  style={{ background: 'var(--gradient-primary)', color: '#fff', boxShadow: '0 8px 24px rgba(123,108,184,0.20)' }}
+                >
+                  ✦
+                </div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  {allChartData ? '你好，我是你的 AI 占星师' : '正在准备排盘数据...'}
+                </p>
+                {allChartData && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    选择上方话题或试试以下问题
+                  </p>
+                )}
+              </div>
               {allChartData && (
-                <div className="flex flex-wrap justify-center gap-2">
+                <div className="stagger-children flex flex-wrap justify-center gap-2">
                   {COLD_START_QUESTIONS.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => sendMessage(q)}
                       disabled={streaming}
-                      className="rounded-full px-4 py-2 text-sm transition disabled:opacity-30"
-                      style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+                      className="rounded-full px-4 py-2.5 text-[13px] transition-all disabled:opacity-30"
+                      style={{
+                        border: '1px solid var(--border-default)',
+                        background: 'var(--bg-base)',
+                        color: 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)';
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-default)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
+                      }}
                     >
                       {q}
                     </button>
@@ -469,24 +571,26 @@ function ChatContent() {
             </div>
           )}
 
+          {/* Messages */}
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+              className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+              style={{ animation: `fadeIn 0.3s ease-out ${Math.min(i * 0.05, 0.3)}s both` }}
               onTouchStart={() => handleTouchStart(i)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onClick={selectMode ? () => toggleSelect(i) : undefined}
-              style={{ cursor: selectMode ? 'pointer' : undefined }}
+              onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
             >
               {/* Selection checkbox */}
               {selectMode && (
                 <div className="flex shrink-0 items-center pt-3">
                   <div
-                    className="flex h-5 w-5 items-center justify-center rounded-full border-2 transition"
+                    className="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
                     style={selected.has(i)
-                      ? { background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }
-                      : { borderColor: 'var(--border-subtle)' }
+                      ? { background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
+                      : { borderColor: 'var(--border-default)', background: 'var(--bg-base)' }
                     }
                   >
                     {selected.has(i) && (
@@ -498,19 +602,45 @@ function ChatContent() {
                 </div>
               )}
 
+              {/* Avatar */}
+              {msg.role === 'assistant' && !selectMode && (
+                <div
+                  className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm text-white"
+                  style={{ background: 'var(--gradient-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.18)' }}
+                >
+                  ✦
+                </div>
+              )}
+
               {/* Message bubble */}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${selectMode && selected.has(i) ? 'ring-2' : ''}`}
+                className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${selectMode && selected.has(i) ? 'ring-2' : ''}`}
                 style={{
                   ...(msg.role === 'user'
-                    ? { background: 'var(--gradient-primary)', color: '#ffffff' }
-                    : { background: 'var(--bg-surface)', color: 'var(--text-primary)' }),
-                  ...(selectMode && selected.has(i) ? { ringColor: 'var(--accent-primary)', outline: '2px solid var(--accent-primary)', outlineOffset: '2px' } : {}),
+                    ? {
+                        background: 'var(--gradient-primary)',
+                        color: '#ffffff',
+                        borderBottomRightRadius: '6px',
+                        boxShadow: '0 2px 12px rgba(123,108,184,0.18)',
+                      }
+                    : {
+                        background: 'var(--bg-surface)',
+                        color: 'var(--text-primary)',
+                        borderBottomLeftRadius: '6px',
+                        border: '1px solid var(--border-subtle)',
+                      }),
+                  ...(selectMode && selected.has(i) ? { outline: '2px solid var(--accent-primary)', outlineOffset: '2px' } : {}),
                 }}
               >
                 <div className={msg.role === 'assistant' ? 'prose-chat' : 'whitespace-pre-wrap'}>
                   {msg.role === 'assistant' ? (
-                    msg.content ? <ReactMarkdown>{msg.content}</ReactMarkdown> : '...'
+                    msg.content ? <ReactMarkdown>{msg.content}</ReactMarkdown> : (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.6s' }} />
+                      </div>
+                    )
                   ) : (
                     msg.content || '...'
                   )}
@@ -519,17 +649,29 @@ function ChatContent() {
             </div>
           ))}
 
+          {/* Suggestions */}
           {suggestions.length > 0 && !streaming && !selectMode && (
-            <div className="flex flex-col gap-2 pt-2">
+            <div className="stagger-children flex flex-col gap-2 pl-10 pt-1">
               {suggestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
-                  className="rounded-xl px-4 py-2.5 text-left text-sm transition"
-                  style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', color: 'var(--accent-primary)' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-surface)'; }}
+                  className="group flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm transition-all"
+                  style={{
+                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-base)',
+                    color: 'var(--accent-primary)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-default)';
+                  }}
                 >
+                  <span className="text-xs" style={{ color: 'var(--accent-primary-light)' }}>→</span>
                   {q}
                 </button>
               ))}
@@ -543,10 +685,11 @@ function ChatContent() {
       <div
         className="fixed left-0 right-0 px-4 py-3"
         style={{
-          bottom: 'calc(56px + env(safe-area-inset-bottom))',
-          borderTop: '1px solid var(--border-subtle)',
-          background: 'rgba(248,247,252,0.92)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          bottom: 'calc(60px + env(safe-area-inset-bottom))',
+          background: 'rgba(255,255,255,0.78)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          borderTop: '1px solid rgba(123,108,184,0.05)',
           zIndex: 40,
         }}
       >
@@ -556,39 +699,48 @@ function ChatContent() {
             <button
               onClick={() => setShowShare(true)}
               disabled={selected.size === 0}
-              className="flex-1 rounded-xl py-2.5 text-sm font-medium transition disabled:opacity-30"
-              style={{ background: 'var(--accent-primary)', color: '#fff' }}
+              className="flex-1 rounded-xl py-3 text-sm font-medium transition-all disabled:opacity-30"
+              style={{ background: 'var(--accent-primary)', color: '#fff', boxShadow: '0 2px 12px rgba(123,108,184,0.20)' }}
             >
               分享 ({selected.size})
             </button>
             <button
               onClick={() => setShowConfirm(true)}
               disabled={selected.size === 0}
-              className="flex-1 rounded-xl py-2.5 text-sm font-medium text-white transition disabled:opacity-30"
-              style={{ background: '#e05060' }}
+              className="flex-1 rounded-xl py-3 text-sm font-medium text-white transition-all disabled:opacity-30"
+              style={{ background: '#e05060', boxShadow: '0 2px 12px rgba(224,80,96,0.20)' }}
             >
               删除 ({selected.size})
             </button>
           </div>
         ) : (
           /* ── Normal input ── */
-          <div className="mx-auto flex max-w-2xl gap-2">
+          <div className="mx-auto flex max-w-2xl gap-2.5">
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
               placeholder="输入你的问题..."
               disabled={streaming}
-              className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:outline-none disabled:opacity-50"
-              style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+              className="flex-1 rounded-2xl px-4 py-3 text-sm transition-all disabled:opacity-50"
+              style={{
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+              }}
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={streaming || !input.trim()}
-              className="rounded-xl px-5 py-2.5 text-sm font-medium text-white transition disabled:opacity-30"
-              style={{ background: 'var(--accent-primary)' }}
+              className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl text-white transition-all disabled:opacity-30"
+              style={{
+                background: input.trim() ? 'var(--gradient-primary)' : 'var(--accent-primary)',
+                boxShadow: input.trim() ? '0 4px 16px rgba(123,108,184,0.30)' : 'none',
+              }}
             >
-              发送
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
             </button>
           </div>
         )}
@@ -616,8 +768,8 @@ function ChatContent() {
       {/* Toast */}
       {toast && (
         <div
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg"
-          style={{ background: 'rgba(0,0,0,0.75)', zIndex: 300 }}
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl px-6 py-3.5 text-sm font-medium text-white animate-scaleIn"
+          style={{ background: 'rgba(26,21,40,0.82)', backdropFilter: 'blur(12px)', zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
         >
           {toast}
         </div>

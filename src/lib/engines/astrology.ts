@@ -321,3 +321,210 @@ export function calculateAstrology(
 
   return { planets, houses, aspects, ascendant: asc, midheaven: mc };
 }
+
+/* ═══════════════════════════════════════ */
+/* 从 UTC Date 直接计算星盘（行运/回归用）   */
+/* ═══════════════════════════════════════ */
+
+export function calculateChartFromDate(
+  utcDate: Date,
+  latitude: number,
+  longitude: number,
+): AstrologyChart {
+  const time = Astronomy.MakeTime(utcDate);
+  const jd = 2451545.0 + (utcDate.getTime() / 86400000 - 10957.5);
+  const { RAMC, epsilon } = calculateRAMC(jd, longitude);
+  const asc = calculateASC(RAMC, epsilon, latitude);
+  const mc = calculateMC(RAMC, epsilon);
+
+  let houses: HousePosition[];
+  if (Math.abs(latitude) > 66) {
+    houses = calculateEqualHouses(asc);
+  } else {
+    houses = calculatePlacidusHouses(asc, mc, RAMC, epsilon, latitude);
+  }
+
+  const planets: PlanetPosition[] = [];
+
+  const sunPos = Astronomy.SunPosition(time);
+  const sunInfo = lonToSign(sunPos.elon);
+  planets.push({
+    name: '太阳', longitude: sunPos.elon, latitude: sunPos.elat,
+    sign: sunInfo.sign, degree: sunInfo.degree, minute: sunInfo.minute,
+    house: getHouseNumber(sunPos.elon, houses), retrograde: false,
+  });
+
+  const moonVec = Astronomy.GeoMoon(time);
+  const moonEcl = Astronomy.Ecliptic(moonVec);
+  const moonInfo = lonToSign(moonEcl.elon);
+  planets.push({
+    name: '月亮', longitude: moonEcl.elon, latitude: moonEcl.elat,
+    sign: moonInfo.sign, degree: moonInfo.degree, minute: moonInfo.minute,
+    house: getHouseNumber(moonEcl.elon, houses), retrograde: false,
+  });
+
+  const bodies = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
+  for (const body of bodies) {
+    const vec = Astronomy.GeoVector(body, time, true);
+    const ecl = Astronomy.Ecliptic(vec);
+    const info = lonToSign(ecl.elon);
+    const timeBefore = Astronomy.MakeTime(new Date(utcDate.getTime() - 86400000));
+    const vecBefore = Astronomy.GeoVector(body, timeBefore, true);
+    const eclBefore = Astronomy.Ecliptic(vecBefore);
+    let lonDiff = ecl.elon - eclBefore.elon;
+    if (lonDiff > 180) lonDiff -= 360;
+    if (lonDiff < -180) lonDiff += 360;
+    planets.push({
+      name: PLANET_NAMES[body] || body,
+      longitude: ecl.elon, latitude: ecl.elat,
+      sign: info.sign, degree: info.degree, minute: info.minute,
+      house: getHouseNumber(ecl.elon, houses), retrograde: lonDiff < 0,
+    });
+  }
+
+  const nodeLon = calculateMeanNode(jd);
+  const nodeInfo = lonToSign(nodeLon);
+  planets.push({
+    name: '北交点', longitude: nodeLon, latitude: 0,
+    sign: nodeInfo.sign, degree: nodeInfo.degree, minute: nodeInfo.minute,
+    house: getHouseNumber(nodeLon, houses), retrograde: true,
+  });
+
+  const aspects = calculateAspects(planets);
+  return { planets, houses, aspects, ascendant: asc, midheaven: mc };
+}
+
+/* ═══════════════════════════════════════ */
+/* 太阳回归盘 (Solar Return)               */
+/* ═══════════════════════════════════════ */
+
+export function findSolarReturn(
+  natalSunLon: number,
+  year: number,
+  latitude: number,
+  longitude: number,
+): { date: Date; chart: AstrologyChart; precision: number } {
+  // SearchSunLongitude: 从 startDate 开始搜索太阳到达 targetLon 的精确时刻
+  const startDate = new Date(Date.UTC(year, 0, 1));
+  const startTime = Astronomy.MakeTime(startDate);
+  const result = Astronomy.SearchSunLongitude(natalSunLon, startTime, 366);
+  if (!result) throw new Error(`无法找到 ${year} 年的太阳回归时刻`);
+
+  const returnDate = result.date;
+  const chart = calculateChartFromDate(returnDate, latitude, longitude);
+
+  // 验证精度
+  const sunPos = Astronomy.SunPosition(result);
+  const error = Math.abs(normalize(sunPos.elon - natalSunLon));
+  const precisionArcsec = Math.min(error, 360 - error) * 3600;
+
+  return { date: returnDate, chart, precision: Math.round(precisionArcsec * 100) / 100 };
+}
+
+/* ═══════════════════════════════════════ */
+/* 月亮回归盘 (Lunar Return)               */
+/* ═══════════════════════════════════════ */
+
+function getMoonLongitude(utcDate: Date): number {
+  const time = Astronomy.MakeTime(utcDate);
+  const moonVec = Astronomy.GeoMoon(time);
+  const moonEcl = Astronomy.Ecliptic(moonVec);
+  return moonEcl.elon;
+}
+
+function searchMoonCrossing(targetLon: number, startDate: Date, limitDays: number = 30): Date | null {
+  const stepMs = 0.04 * 86400000; // ~58 分钟步长（月亮 ~0.5°/小时）
+  let prevLon = getMoonLongitude(startDate);
+
+  for (let ms = stepMs; ms < limitDays * 86400000; ms += stepMs) {
+    const date = new Date(startDate.getTime() + ms);
+    const lon = getMoonLongitude(date);
+
+    // delta = normalize(target - moonLon) = 月亮还需前进多少度到达目标
+    // 月亮前进时 delta 递减; 跨过目标时 delta 从接近 0 跳到接近 360
+    const prevDelta = normalize(targetLon - prevLon);
+    const currDelta = normalize(targetLon - lon);
+
+    // 检测跨越: prevDelta 很小 (接近目标) → currDelta 很大 (刚过目标)
+    if (prevDelta < 180 && currDelta > 180) {
+      // 二分搜索精确时刻
+      let lo = startDate.getTime() + ms - stepMs;
+      let hi = startDate.getTime() + ms;
+      for (let iter = 0; iter < 50; iter++) {
+        const mid = (lo + hi) / 2;
+        const midDate = new Date(mid);
+        const midLon = getMoonLongitude(midDate);
+        const midDelta = normalize(targetLon - midLon);
+        if (midDelta < 180) {
+          // 还没跨过，向后搜
+          lo = mid;
+        } else {
+          // 已经跨过，向前搜
+          hi = mid;
+        }
+      }
+      return new Date((lo + hi) / 2);
+    }
+    prevLon = lon;
+  }
+  return null;
+}
+
+export function findLunarReturn(
+  natalMoonLon: number,
+  afterDate: Date,
+  latitude: number,
+  longitude: number,
+): { date: Date; chart: AstrologyChart; nextDate: Date | null; precision: number } {
+  const returnDate = searchMoonCrossing(natalMoonLon, afterDate, 30);
+  if (!returnDate) throw new Error('无法找到月亮回归时刻');
+
+  const chart = calculateChartFromDate(returnDate, latitude, longitude);
+
+  // 精度验证
+  const actualMoonLon = getMoonLongitude(returnDate);
+  const error = Math.abs(normalize(actualMoonLon - natalMoonLon));
+  const precisionArcsec = Math.min(error, 360 - error) * 3600;
+
+  // 查找下一次月亮回归（约 27.3 天后）
+  const nextSearch = new Date(returnDate.getTime() + 25 * 86400000);
+  const nextDate = searchMoonCrossing(natalMoonLon, nextSearch, 5);
+
+  return { date: returnDate, chart, nextDate, precision: Math.round(precisionArcsec * 100) / 100 };
+}
+
+/* ═══════════════════════════════════════ */
+/* 交叉相位（本命 vs 行运）                 */
+/* ═══════════════════════════════════════ */
+
+export function calculateCrossAspects(
+  natalPlanets: PlanetPosition[],
+  transitPlanets: PlanetPosition[],
+): Aspect[] {
+  const aspects: Aspect[] = [];
+  for (const np of natalPlanets) {
+    for (const tp of transitPlanets) {
+      let diff = Math.abs(np.longitude - tp.longitude);
+      if (diff > 180) diff = 360 - diff;
+      for (const asp of ASPECT_TYPES) {
+        const orb = Math.abs(diff - asp.angle);
+        if (orb <= asp.orb) {
+          aspects.push({
+            planet1: `行${PLANET_SHORT_EN[tp.name] || tp.name}`,
+            planet2: `本${PLANET_SHORT_EN[np.name] || np.name}`,
+            type: asp.name,
+            angle: asp.angle,
+            orb: Math.round(orb * 100) / 100,
+          });
+          break;
+        }
+      }
+    }
+  }
+  return aspects.sort((a, b) => a.orb - b.orb);
+}
+
+const PLANET_SHORT_EN: Record<string, string> = {
+  '太阳': '日', '月亮': '月', '水星': '水', '金星': '金', '火星': '火',
+  '木星': '木', '土星': '土', '天王星': '天', '海王星': '海', '冥王星': '冥', '北交点': '☊',
+};

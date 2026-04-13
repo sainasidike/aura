@@ -14,7 +14,7 @@ const REPORT_META: Record<string, { title: string; icon: string; color: string }
 
 export default function ReportPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>加载中...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center" style={{ color: 'var(--text-tertiary)' }}><span className="animate-breathe">加载中...</span></div>}>
       <ReportContent />
     </Suspense>
   );
@@ -49,7 +49,6 @@ function ReportContent() {
     setReport('');
 
     try {
-      // Step 1: Get chart data (astrology + bazi)
       const [astroRes, baziRes] = await Promise.all([
         fetch('/api/astrology', {
           method: 'POST',
@@ -80,7 +79,6 @@ function ReportContent() {
       setChartLoading(false);
       setLoading(true);
 
-      // Step 2: Stream AI report
       const chartData = {
         profile: { name: profile.name, gender: profile.gender, birthDate: `${profile.year}-${profile.month}-${profile.day}`, birthTime: `${profile.hour}:${profile.minute}`, city: profile.city },
         astrology: astroData.chart,
@@ -144,80 +142,105 @@ function ReportContent() {
 
   if (!profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center">
-          <p className="mb-4" style={{ color: 'var(--text-tertiary)' }}>请先创建一个档案</p>
-          <Link href="/profile" className="rounded-lg px-4 py-2 text-sm" style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}>前往档案管理</Link>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6">
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl text-3xl" style={{ background: `${meta.color}15`, color: meta.color }}>
+          {meta.icon}
         </div>
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>请先创建一个档案</p>
+        <Link href="/profile" className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: 'var(--gradient-primary)', boxShadow: '0 4px 16px rgba(123,108,184,0.25)' }}>
+          创建档案
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 pb-24">
+    <div className="min-h-screen px-5 py-6 pb-24">
       <div className="mx-auto max-w-2xl">
         {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <Link href="/chart" className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            <span>&larr;</span>
-            <span style={{ color: meta.color }}>{meta.icon}</span>
-            <span style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', fontWeight: 500 }}>{meta.title}</span>
+        <div className="mb-5 flex items-center justify-between">
+          <Link href="/chart" className="flex items-center gap-2 text-sm transition"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>←</span>
+            <span style={{ color: meta.color, fontSize: '16px' }}>{meta.icon}</span>
+            <span style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', fontWeight: 600 }}>{meta.title}</span>
           </Link>
-          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          <div className="rounded-full px-3 py-1 text-xs" style={{ background: 'var(--bg-surface)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)' }}>
             {profile.name} · {profile.year}.{profile.month}.{profile.day}
           </div>
         </div>
 
-        {/* Generate button or report content */}
+        {/* Generate button */}
         {!report && !loading && !chartLoading && !error && (
-          <div className="flex flex-col items-center py-16">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl" style={{ background: `${meta.color}15`, color: meta.color }}>
+          <div className="flex flex-col items-center py-16 animate-fadeIn">
+            <div
+              className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
+              style={{ background: `${meta.color}12`, color: meta.color, boxShadow: `0 8px 24px ${meta.color}15` }}
+            >
               {meta.icon}
             </div>
-            <p className="mb-2 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.title}</p>
-            <p className="mb-6 text-sm" style={{ color: 'var(--text-tertiary)' }}>AI 将根据你的星盘数据生成专属报告</p>
+            <p className="mb-1.5 text-lg font-semibold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>{meta.title}</p>
+            <p className="mb-8 text-sm" style={{ color: 'var(--text-tertiary)' }}>AI 将根据你的星盘数据生成专属报告</p>
             <button
               onClick={generateReport}
-              className="rounded-xl px-6 py-3 text-sm font-medium transition active:scale-95"
-              style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}
+              className="rounded-full px-8 py-3 text-sm font-semibold transition active:scale-95"
+              style={{
+                background: 'var(--gradient-primary)',
+                color: 'var(--text-inverse)',
+                boxShadow: '0 4px 20px rgba(123,108,184,0.30)',
+              }}
             >
               生成报告
             </button>
           </div>
         )}
 
+        {/* Loading states */}
         {chartLoading && (
-          <div className="text-center py-16">
+          <div className="flex flex-col items-center gap-3 py-16">
+            <div className="animate-breathe">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-lg" style={{ background: `${meta.color}15`, color: meta.color }}>{meta.icon}</div>
+            </div>
             <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>正在计算星盘数据...</p>
           </div>
         )}
 
         {loading && !report && (
-          <div className="text-center py-16">
+          <div className="flex flex-col items-center gap-3 py-16">
+            <div className="animate-breathe">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-lg" style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>✦</div>
+            </div>
             <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>AI 正在撰写报告...</p>
           </div>
         )}
 
         {error && (
-          <div className="text-center py-16">
-            <p className="mb-4 text-sm" style={{ color: 'var(--error)' }}>{error}</p>
-            <button onClick={generateReport} className="rounded-lg px-4 py-2 text-sm" style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}>
+          <div className="flex flex-col items-center gap-4 py-16">
+            <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>
+            <button onClick={generateReport} className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: 'var(--gradient-primary)' }}>
               重试
             </button>
           </div>
         )}
 
+        {/* Report content */}
         {report && (
           <div ref={contentRef}
-            className="prose-chat rounded-xl p-5"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            className="animate-fadeIn prose-chat rounded-2xl p-6"
+            style={{
+              background: 'var(--bg-base)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)',
+              boxShadow: 'var(--shadow-card)',
+            }}
             dangerouslySetInnerHTML={{ __html: simpleMarkdown(report) }}
           />
         )}
 
         {loading && report && (
-          <div className="mt-2 text-center">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: 'var(--accent-primary)' }} />
+          <div className="mt-3 flex justify-center">
+            <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
           </div>
         )}
       </div>
@@ -225,7 +248,7 @@ function ReportContent() {
   );
 }
 
-/** Minimal markdown → HTML (no dependency needed) */
+/** Minimal markdown to HTML */
 function simpleMarkdown(text: string): string {
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

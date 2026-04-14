@@ -65,16 +65,16 @@ export const CITIES: CityData[] = [
   { name: '西宁', province: '青海', longitude: 101.78, latitude: 36.62, timezone: 'Asia/Shanghai' },
   // 宁夏
   { name: '银川', province: '宁夏', longitude: 106.27, latitude: 38.47, timezone: 'Asia/Shanghai' },
-  // 新疆 — 注意用 UTC+6
-  { name: '乌鲁木齐', province: '新疆', longitude: 87.62, latitude: 43.83, timezone: 'Asia/Urumqi' },
-  { name: '阿克苏', province: '新疆', longitude: 80.26, latitude: 41.17, timezone: 'Asia/Urumqi' },
-  { name: '库尔勒', province: '新疆', longitude: 86.15, latitude: 41.76, timezone: 'Asia/Urumqi' },
-  { name: '伊宁', province: '新疆', longitude: 81.33, latitude: 43.91, timezone: 'Asia/Urumqi' },
-  { name: '喀什', province: '新疆', longitude: 75.99, latitude: 39.47, timezone: 'Asia/Urumqi' },
-  { name: '和田', province: '新疆', longitude: 79.93, latitude: 37.11, timezone: 'Asia/Urumqi' },
-  { name: '哈密', province: '新疆', longitude: 93.51, latitude: 42.83, timezone: 'Asia/Urumqi' },
-  { name: '克拉玛依', province: '新疆', longitude: 84.87, latitude: 45.59, timezone: 'Asia/Urumqi' },
-  { name: '吐鲁番', province: '新疆', longitude: 89.18, latitude: 42.95, timezone: 'Asia/Urumqi' },
+  // 新疆 — 统一用北京时间 (UTC+8)，因为出生证/户口本记录的都是北京时间
+  { name: '乌鲁木齐', province: '新疆', longitude: 87.62, latitude: 43.83, timezone: 'Asia/Shanghai' },
+  { name: '阿克苏', province: '新疆', longitude: 80.26, latitude: 41.17, timezone: 'Asia/Shanghai' },
+  { name: '库尔勒', province: '新疆', longitude: 86.15, latitude: 41.76, timezone: 'Asia/Shanghai' },
+  { name: '伊宁', province: '新疆', longitude: 81.33, latitude: 43.91, timezone: 'Asia/Shanghai' },
+  { name: '喀什', province: '新疆', longitude: 75.99, latitude: 39.47, timezone: 'Asia/Shanghai' },
+  { name: '和田', province: '新疆', longitude: 79.93, latitude: 37.11, timezone: 'Asia/Shanghai' },
+  { name: '哈密', province: '新疆', longitude: 93.51, latitude: 42.83, timezone: 'Asia/Shanghai' },
+  { name: '克拉玛依', province: '新疆', longitude: 84.87, latitude: 45.59, timezone: 'Asia/Shanghai' },
+  { name: '吐鲁番', province: '新疆', longitude: 89.18, latitude: 42.95, timezone: 'Asia/Shanghai' },
   // 特别行政区
   { name: '香港', province: '香港', longitude: 114.17, latitude: 22.28, timezone: 'Asia/Hong_Kong' },
   { name: '澳门', province: '澳门', longitude: 113.54, latitude: 22.20, timezone: 'Asia/Macau' },

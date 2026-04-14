@@ -10,6 +10,8 @@ import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/l
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { annotateDataRefs } from '@/lib/annotate-data-refs';
 import { parseChatSections } from '@/lib/parse-chat-sections';
+import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
+import type { AstrologyChart } from '@/types';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ShareModal from '@/components/ui/ShareModal';
@@ -70,6 +72,9 @@ function ChatContent() {
   // Glossary
   const [glossaryEntry, setGlossaryEntry] = useState<GlossaryEntry | null>(null);
   const [glossaryRect, setGlossaryRect] = useState<DOMRect | null>(null);
+
+  // Chart panel (mobile toggle)
+  const [chartExpanded, setChartExpanded] = useState(false);
 
   // Modals
   const [showConfirm, setShowConfirm] = useState(false);
@@ -503,7 +508,7 @@ function ChatContent() {
 
       {/* ─── Messages ─── */}
       <div className="flex-1 overflow-y-auto px-4 pb-40" style={{ paddingTop: selectMode ? '60px' : '68px' }}>
-        <div className="mx-auto max-w-2xl space-y-5">
+        <div className="mx-auto max-w-2xl md:max-w-4xl space-y-5">
           {/* Cold start */}
           {messages.length === 0 && (
             <div className="py-8 animate-fadeIn">
@@ -601,8 +606,11 @@ function ChatContent() {
               ? parseChatSections(msg.content)
               : null;
 
-            // ── Card-style layout (full-width, no bubble) ──
+            // ── Card-style layout with left-right split ──
             if (cardSections && cardSections.length > 0) {
+              const natalChart = (getChartData()?.natalChart) as AstrologyChart | undefined;
+              const natalPlanets = natalChart?.planets;
+
               return (
                 <div
                   key={i}
@@ -632,110 +640,182 @@ function ChatContent() {
                     </div>
                   )}
 
-                  {/* Card sections - full width */}
-                  <div className="space-y-3" onClick={handleGlossaryClick}>
-                    {cardSections.map((sec, si) => {
-                      const isSummary = sec.tag === 'SUMMARY';
-                      const isLastSection = si === cardSections.length - 1;
-                      const showStreamingDot = isStreamingThis && isLastSection;
-                      return (
+                  {/* ── Left-right split layout ── */}
+                  <div className="flex flex-col md:flex-row md:gap-5">
+
+                    {/* ── LEFT: Chart panel ── */}
+                    {natalChart && (
+                      <div className="mb-4 md:mb-0 md:w-[280px] md:shrink-0">
                         <div
-                          key={si}
-                          className="section-card overflow-hidden rounded-2xl"
-                          style={{
-                            background: isSummary
-                              ? `linear-gradient(135deg, ${sec.color}18, ${sec.color}08)`
-                              : 'var(--bg-base)',
-                            border: `1px solid ${sec.color}25`,
-                            borderLeft: `3px solid ${sec.color}`,
-                            boxShadow: isSummary
-                              ? `0 4px 20px ${sec.color}15, var(--shadow-card)`
-                              : 'var(--shadow-card)',
-                            animation: isStreamingThis ? 'none' : `fadeInUp 0.4s ease-out ${si * 0.08}s both`,
-                          }}
+                          className="overflow-hidden rounded-2xl md:sticky md:top-[76px]"
+                          style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}
                         >
-                          {/* Card header */}
-                          <div
-                            className="flex items-center gap-2.5 px-4 py-3"
-                            style={{
-                              borderBottom: `1px solid ${sec.color}12`,
-                              background: `linear-gradient(135deg, ${sec.color}10, transparent)`,
-                            }}
+                          {/* Mobile: collapsible header */}
+                          <button
+                            className="flex w-full items-center justify-between px-4 py-3 md:hidden"
+                            style={{ background: 'linear-gradient(135deg, rgba(123,108,184,0.06), transparent)' }}
+                            onClick={(e) => { e.stopPropagation(); setChartExpanded(v => !v); }}
                           >
-                            <span
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
-                              style={{
-                                background: `linear-gradient(135deg, ${sec.color}, ${sec.color}cc)`,
-                                color: '#fff',
-                                boxShadow: `0 2px 8px ${sec.color}30`,
-                              }}
+                            <span className="flex items-center gap-2">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-white" style={{ background: 'var(--gradient-primary)' }}>☉</span>
+                              <span className="text-[13px] font-semibold" style={{ color: 'var(--accent-primary)' }}>星盘数据</span>
+                            </span>
+                            <svg
+                              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round"
+                              style={{ transform: chartExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
                             >
-                              {sec.icon}
-                            </span>
-                            <span className="text-[13px] font-semibold tracking-wide" style={{ color: sec.color }}>
-                              {sec.title}
-                            </span>
-                            {showStreamingDot && (
-                              <span className="ml-auto flex items-center gap-1">
-                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color }} />
-                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.3s' }} />
-                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.6s' }} />
-                              </span>
-                            )}
-                          </div>
-                          {/* Card body with structured sub-sections */}
-                          <div className="px-4 py-3 space-y-2.5">
-                            {sec.parts.length > 0 ? sec.parts.map((part, pi) => {
-                              if (part.type === 'text') {
-                                return (
-                                  <div
-                                    key={pi}
-                                    className="prose-chat text-[13px] leading-[1.8]"
-                                    style={{ color: 'var(--text-secondary)' }}
-                                    dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
-                                  />
-                                );
-                              }
-                              const partStyle = {
-                                data:    { bg: 'rgba(123,108,184,0.06)', border: 'rgba(123,108,184,0.12)', iconBg: '#7b6cb8' },
-                                insight: { bg: 'rgba(94,216,207,0.06)',  border: 'rgba(94,216,207,0.12)',  iconBg: '#3abfb6' },
-                                advice:  { bg: 'rgba(184,150,62,0.06)', border: 'rgba(184,150,62,0.12)',  iconBg: '#b8963e' },
-                              }[part.type] || { bg: 'transparent', border: 'transparent', iconBg: '#999' };
-                              return (
-                                <div
-                                  key={pi}
-                                  className="rounded-xl px-3 py-2.5"
-                                  style={{ background: partStyle.bg, border: `1px solid ${partStyle.border}` }}
-                                >
-                                  <div className="mb-1 flex items-center gap-1.5">
-                                    <span
-                                      className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px]"
-                                      style={{ background: partStyle.iconBg, color: '#fff' }}
-                                    >
-                                      {part.emoji}
-                                    </span>
-                                    <span className="text-[11px] font-medium" style={{ color: partStyle.iconBg, opacity: 0.8 }}>
-                                      {part.label}
-                                    </span>
-                                  </div>
-                                  <div
-                                    className="prose-chat text-[13px] leading-[1.75]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                    dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
-                                  />
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </button>
+
+                          {/* Chart content: always visible on md+, toggle on mobile */}
+                          <div className={`${chartExpanded ? 'block' : 'hidden'} md:block`}>
+                            {/* SVG Chart */}
+                            <div className="flex justify-center px-3 py-3" style={{ background: 'linear-gradient(180deg, rgba(123,108,184,0.03), transparent)' }}>
+                              <div style={{ maxWidth: '240px', width: '100%' }}>
+                                <NatalChartSVG chart={natalChart} />
+                              </div>
+                            </div>
+
+                            {/* Planet summary table */}
+                            {natalPlanets && natalPlanets.length > 0 && (
+                              <div className="border-t px-3 py-2.5" style={{ borderColor: 'var(--border-subtle)' }}>
+                                <p className="mb-2 text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
+                                  行星位置
+                                </p>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                  {natalPlanets.slice(0, 10).map((p) => (
+                                    <div key={p.name} className="flex items-center gap-1.5 text-[11px]">
+                                      <span style={{ color: 'var(--accent-primary)', fontWeight: 600, width: '24px' }}>
+                                        {p.name.slice(0, 2)}
+                                      </span>
+                                      <span style={{ color: 'var(--text-secondary)' }}>
+                                        {p.sign}{p.degree}°{String(p.minute).padStart(2, '0')}&apos;
+                                      </span>
+                                      {p.retrograde && (
+                                        <span className="text-[9px] font-bold" style={{ color: '#c05050' }}>R</span>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                              );
-                            }) : (
-                              <div
-                                className="prose-chat text-[13px] leading-[1.8]"
-                                style={{ color: 'var(--text-primary)' }}
-                                dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
-                              />
+                                {/* Key angles */}
+                                <div className="mt-2 flex gap-3 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                                  <span>ASC {natalChart.ascendant.toFixed(1)}°</span>
+                                  <span>MC {natalChart.midheaven.toFixed(1)}°</span>
+                                  <span>{natalChart.aspects?.length || 0} 相位</span>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
+
+                    {/* ── RIGHT: Card sections ── */}
+                    <div className="flex-1 min-w-0 space-y-3" onClick={handleGlossaryClick}>
+                      {cardSections.map((sec, si) => {
+                        const isSummary = sec.tag === 'SUMMARY';
+                        const isLastSection = si === cardSections.length - 1;
+                        const showStreamingDot = isStreamingThis && isLastSection;
+                        return (
+                          <div
+                            key={si}
+                            className="section-card overflow-hidden rounded-2xl"
+                            style={{
+                              background: isSummary
+                                ? `linear-gradient(135deg, ${sec.color}18, ${sec.color}08)`
+                                : 'var(--bg-base)',
+                              border: `1px solid ${sec.color}25`,
+                              borderLeft: `3px solid ${sec.color}`,
+                              boxShadow: isSummary
+                                ? `0 4px 20px ${sec.color}15, var(--shadow-card)`
+                                : 'var(--shadow-card)',
+                              animation: isStreamingThis ? 'none' : `fadeInUp 0.4s ease-out ${si * 0.08}s both`,
+                            }}
+                          >
+                            {/* Card header */}
+                            <div
+                              className="flex items-center gap-2.5 px-4 py-3"
+                              style={{
+                                borderBottom: `1px solid ${sec.color}12`,
+                                background: `linear-gradient(135deg, ${sec.color}10, transparent)`,
+                              }}
+                            >
+                              <span
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
+                                style={{
+                                  background: `linear-gradient(135deg, ${sec.color}, ${sec.color}cc)`,
+                                  color: '#fff',
+                                  boxShadow: `0 2px 8px ${sec.color}30`,
+                                }}
+                              >
+                                {sec.icon}
+                              </span>
+                              <span className="text-[13px] font-semibold tracking-wide" style={{ color: sec.color }}>
+                                {sec.title}
+                              </span>
+                              {showStreamingDot && (
+                                <span className="ml-auto flex items-center gap-1">
+                                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color }} />
+                                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.3s' }} />
+                                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.6s' }} />
+                                </span>
+                              )}
+                            </div>
+                            {/* Card body with structured sub-sections */}
+                            <div className="px-4 py-3 space-y-2.5">
+                              {sec.parts.length > 0 ? sec.parts.map((part, pi) => {
+                                if (part.type === 'text') {
+                                  return (
+                                    <div
+                                      key={pi}
+                                      className="prose-chat text-[13px] leading-[1.8]"
+                                      style={{ color: 'var(--text-secondary)' }}
+                                      dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
+                                    />
+                                  );
+                                }
+                                const partStyle = {
+                                  data:    { bg: 'rgba(123,108,184,0.06)', border: 'rgba(123,108,184,0.12)', iconBg: '#7b6cb8' },
+                                  insight: { bg: 'rgba(94,216,207,0.06)',  border: 'rgba(94,216,207,0.12)',  iconBg: '#3abfb6' },
+                                  advice:  { bg: 'rgba(184,150,62,0.06)', border: 'rgba(184,150,62,0.12)',  iconBg: '#b8963e' },
+                                }[part.type] || { bg: 'transparent', border: 'transparent', iconBg: '#999' };
+                                return (
+                                  <div
+                                    key={pi}
+                                    className="rounded-xl px-3 py-2.5"
+                                    style={{ background: partStyle.bg, border: `1px solid ${partStyle.border}` }}
+                                  >
+                                    <div className="mb-1 flex items-center gap-1.5">
+                                      <span
+                                        className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px]"
+                                        style={{ background: partStyle.iconBg, color: '#fff' }}
+                                      >
+                                        {part.emoji}
+                                      </span>
+                                      <span className="text-[11px] font-medium" style={{ color: partStyle.iconBg, opacity: 0.8 }}>
+                                        {part.label}
+                                      </span>
+                                    </div>
+                                    <div
+                                      className="prose-chat text-[13px] leading-[1.75]"
+                                      style={{ color: 'var(--text-primary)' }}
+                                      dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
+                                    />
+                                  </div>
+                                );
+                              }) : (
+                                <div
+                                  className="prose-chat text-[13px] leading-[1.8]"
+                                  style={{ color: 'var(--text-primary)' }}
+                                  dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );

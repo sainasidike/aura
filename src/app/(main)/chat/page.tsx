@@ -519,8 +519,6 @@ function ChatContent() {
                 </p>
                 {allChartData && (() => {
                   const natal = allChartData.natalChart as { planets?: { name: string; sign: string; degree: number; minute?: number }[]; houses?: unknown[]; aspects?: unknown[]; ascendant?: number } | undefined;
-                  const bazi = allChartData.bazi as { fourPillars?: { year: { ganZhi: string }; month: { ganZhi: string }; day: { ganZhi: string }; time: { ganZhi: string } } } | undefined;
-                  const ziwei = allChartData.ziwei as { destinyMaster?: string } | undefined;
 
                   const sun = natal?.planets?.find(p => p.name === '太阳');
                   const moon = natal?.planets?.find(p => p.name === '月亮');
@@ -531,13 +529,12 @@ function ChatContent() {
                   const planetCount = natal?.planets?.length || 0;
                   const houseCount = natal?.houses?.length || 0;
                   const aspectCount = natal?.aspects?.length || 0;
-                  const fp = bazi?.fourPillars;
 
-                  const hasSummary = sun || moon || ascSign || fp || ziwei?.destinyMaster;
+                  const hasSummary = sun || moon || ascSign;
 
                   return hasSummary ? (
                     <div className="mt-3 w-full max-w-xs rounded-xl px-4 py-3 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
-                      <p className="mb-1.5 text-[11px] font-medium tracking-wide" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>已加载排盘数据</p>
+                      <p className="mb-1.5 text-[11px] font-medium tracking-wide" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>已加载星盘数据</p>
                       {(sun || moon || ascSign) && (
                         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                           {sun && <span>☉ {sun.sign}{sun.degree}°{sun.minute != null ? String(sun.minute).padStart(2, '0') + "'" : ''}</span>}
@@ -550,13 +547,6 @@ function ChatContent() {
                       {planetCount > 0 && (
                         <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                           {planetCount} 颗行星 · {houseCount} 宫位 · {aspectCount} 个相位
-                        </p>
-                      )}
-                      {(fp || ziwei?.destinyMaster) && (
-                        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                          {fp && <span>八字：{fp.year.ganZhi} {fp.month.ganZhi} {fp.day.ganZhi} {fp.time.ganZhi}</span>}
-                          {fp && ziwei?.destinyMaster && ' | '}
-                          {ziwei?.destinyMaster && <span>紫微命主：{ziwei.destinyMaster}</span>}
                         </p>
                       )}
                     </div>

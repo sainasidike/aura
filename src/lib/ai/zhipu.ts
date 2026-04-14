@@ -270,25 +270,78 @@ ${compressChartData(chartData)}
 ${COMMON_RULES}`;
   }
 
-  // 默认：综合分析
-  return `你是精通西洋占星、八字、紫微斗数的命理师。你的核心优势是三大体系融合分析。
+  // 默认：纯星盘占星分析
+  return `你是专业西洋占星师。你只使用西洋占星学体系进行分析，不使用八字、紫微斗数或其他命理体系。
 
-## 强制要求
-每次回答必须同时引用至少两个体系的数据，按以下格式分段：
-1. **星盘分析**：引用行星、宫位、相位的具体度数
-2. **八字分析**：引用四柱干支、日主五行、十神、大运
-3. **紫微分析**：引用命宫主星、各宫星曜、四化
-4. **三体系交叉验证**：将三个体系的结论进行对照，找出一致或互补的信息
+## 分析框架
+- 性格 → 太阳星座+宫位、月亮星座+宫位、上升星座、主要相位
+- 事业 → MC(中天)、10宫、6宫、2宫、太阳/土星/木星
+- 感情 → 7宫(DSC)、5宫、金星、月亮、火星的星座+宫位+相位
+- 运势 → 行运盘交叉相位（容许度越小影响越强）
+- 年运 → 日返盘（太阳回归盘）
+- 月运 → 月返盘（月亮回归盘）
 
-如果用户问运势，先看行运相位，再看大运流年，再看紫微流年四化。
-如果用户问性格，先看本命盘（日月升），再看八字日主+十神，再看紫微命宫主星。
-如果用户问事业，先看10宫/MC/土星，再看八字财星官星，再看紫微官禄宫。
-如果用户问感情，先看7宫/金星/月亮，再看八字配偶星，再看紫微夫妻宫。
-
-禁止只用一个体系回答。如果某体系数据缺失才可跳过。
+## 回答要求
+- 每段首句必须引用具体星盘数据（行星、星座、度数、宫位、相位类型+容许度）
+- 解释该数据的占星学含义，再给出具体建议
+- 禁止使用八字、紫微斗数、五行等中国命理概念
 
 ## 排盘数据
-${compressChartData(chartData)}
+${compressAstrologyOnly(chartData)}
 
 ${COMMON_RULES}`;
+}
+
+/** 只提取西洋占星数据（本命盘/行运盘/日返盘/月返盘），不含八字和紫微 */
+function compressAstrologyOnly(data: Record<string, unknown>): string {
+  const sections: string[] = [];
+
+  const p = data.profile as Record<string, unknown> | undefined;
+  if (p) {
+    sections.push(`【用户】${p.name || ''} ${p.gender || ''} ${p.birthDate || ''} ${p.birthTime || ''} ${p.city || ''}`);
+  }
+
+  const natal = data.natalChart as Record<string, unknown> | undefined;
+  if (natal) {
+    let nText = '【本命盘】';
+    if (natal.planets) nText += '\n' + fmtPlanets(natal.planets as CompactPlanet[]);
+    if (natal.ascendant != null) nText += `\nASC ${(natal.ascendant as number).toFixed(1)}° MC ${(natal.midheaven as number).toFixed(1)}°`;
+    if (natal.houses) nText += '\n宫头：' + fmtHouses(natal.houses as CompactHouse[]);
+    if (natal.aspects) nText += '\n相位：' + fmtAspects(natal.aspects as CompactAspect[]);
+    sections.push(nText);
+  }
+
+  const transit = data.transitChart as Record<string, unknown> | undefined;
+  if (transit) {
+    let tText = `【行运盘】${data.transitTime || ''}`;
+    if (transit.planets) tText += '\n' + fmtPlanets((transit.planets as CompactPlanet[]).slice(0, 10));
+    sections.push(tText);
+  }
+
+  const cross = data.crossAspects as CompactAspect[] | undefined;
+  if (cross?.length) {
+    sections.push('【行运×本命相位】' + fmtAspects(cross, 15));
+  }
+
+  const sr = data.solarReturn as Record<string, unknown> | undefined;
+  if (sr) {
+    const chart = sr.chart as Record<string, unknown>;
+    let sText = `【日返盘 ${sr.year || ''}年】`;
+    if (chart?.planets) sText += '\n' + fmtPlanets(chart.planets as CompactPlanet[]);
+    if (chart?.ascendant != null) sText += `\nASC ${(chart.ascendant as number).toFixed(1)}° MC ${(chart.midheaven as number).toFixed(1)}°`;
+    if (chart?.houses) sText += '\n宫头：' + fmtHouses(chart.houses as CompactHouse[]);
+    sections.push(sText);
+  }
+
+  const lr = data.lunarReturn as Record<string, unknown> | undefined;
+  if (lr) {
+    const chart = lr.chart as Record<string, unknown>;
+    let lText = '【月返盘】';
+    if (chart?.planets) lText += '\n' + fmtPlanets(chart.planets as CompactPlanet[]);
+    if (chart?.ascendant != null) lText += `\nASC ${(chart.ascendant as number).toFixed(1)}° MC ${(chart.midheaven as number).toFixed(1)}°`;
+    if (chart?.houses) lText += '\n宫头：' + fmtHouses(chart.houses as CompactHouse[]);
+    sections.push(lText);
+  }
+
+  return sections.join('\n\n');
 }

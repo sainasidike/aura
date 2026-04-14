@@ -350,7 +350,7 @@ export default function TarotPage() {
 
   return (
     <div
-      className="min-h-screen pb-24"
+      className="min-h-screen pb-32"
       style={{
         background: 'linear-gradient(180deg, #0f0a1e 0%, #1a1235 30%, #1e1540 60%, #150f2e 100%)',
         color: '#e8e0f8',
@@ -587,6 +587,7 @@ export default function TarotPage() {
                             className="h-full w-full object-cover"
                             style={{ transform: dc.isReversed ? 'rotate(180deg)' : 'none' }}
                             loading="lazy"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                           <div className="absolute bottom-0 left-0 right-0 p-1 text-center" style={{ background: 'linear-gradient(transparent, rgba(15,10,30,0.85))' }}>
                             <p className="text-[0.55rem] font-bold leading-tight" style={{ color: 'rgba(220,200,255,0.9)' }}>
@@ -619,6 +620,7 @@ export default function TarotPage() {
                     className="h-20 w-14 flex-shrink-0 rounded-lg object-cover"
                     style={{ transform: drawnCards[expandedCard].isReversed ? 'rotate(180deg)' : 'none' }}
                     loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                   <div className="flex-1">
                     <p className="text-sm font-bold" style={{ color: 'rgba(220,200,255,0.9)' }}>
@@ -764,6 +766,7 @@ export default function TarotPage() {
                         className="h-full w-full rounded-sm object-cover"
                         style={{ transform: dc.isReversed ? 'rotate(180deg)' : 'none' }}
                         loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     </div>
                     <span className="text-[0.55rem]" style={{ color: 'rgba(180,160,240,0.5)' }}>{dc.position}</span>

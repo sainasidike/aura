@@ -805,7 +805,7 @@ export default function FortunePage() {
                           {fortune.chartType === 'solar_return' ? '日返盘相位' : fortune.chartType === 'lunar_return' ? '月返盘相位' : '行运相位影响'}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {data.aspects.map((asp, i) => {
+                          {data.aspects.filter((asp, i, arr) => arr.findIndex(a => a.transit === asp.transit && a.natal === asp.natal && a.type === asp.type) === i).map((asp, i) => {
                             const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.08)", text: "#888" };
                             return (
                               <button key={i}

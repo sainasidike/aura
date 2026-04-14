@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { getProfileById, getProfiles, getActiveProfileId, type StoredProfile } from '@/lib/storage';
 import { fetchNatalChart } from '@/lib/chart-cache';
 import { NatalChartSVG, ParamsDisplay, AspectGrid, TransitOverlaySVG, ReturnDetailPanel, TransitAspectsList } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
@@ -207,6 +207,11 @@ function AstrologyContent() {
   useEffect(() => {
     if (paramProfileId) {
       const p = getProfileById(paramProfileId);
+      if (p) { setProfile(p); return; }
+    }
+    const savedId = getActiveProfileId();
+    if (savedId) {
+      const p = getProfileById(savedId);
       if (p) { setProfile(p); return; }
     }
     const all = getProfiles();

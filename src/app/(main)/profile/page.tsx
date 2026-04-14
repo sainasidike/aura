@@ -77,7 +77,7 @@ function ProfileContent() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 pb-24">
+    <div className="min-h-screen px-4 py-6 pb-32">
       <div className="mx-auto max-w-lg">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">

@@ -35,8 +35,20 @@ function CompositeContent() {
   useEffect(() => {
     const ps = getProfiles();
     setProfiles(ps);
-    if (ps.length > 0) setSelectedA(ps[0]);
+    if (ps.length > 0) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('aura_pair') || '{}');
+        const a = saved.a && ps.find((p: StoredProfile) => p.id === saved.a);
+        const b = saved.b && ps.find((p: StoredProfile) => p.id === saved.b);
+        setSelectedA(a || ps[0]);
+        if (b && b.id !== (a || ps[0]).id) setSelectedB(b);
+      } catch { setSelectedA(ps[0]); }
+    }
   }, []);
+
+  useEffect(() => {
+    if (selectedA) try { localStorage.setItem('aura_pair', JSON.stringify({ a: selectedA.id, b: selectedB?.id || '' })); } catch { /* */ }
+  }, [selectedA, selectedB]);
 
   // Load cache
   useEffect(() => {

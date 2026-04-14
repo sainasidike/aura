@@ -37,24 +37,15 @@ export async function POST(request: NextRequest) {
 
     const label = REPORT_LABELS[reportType] || '报告';
 
-    const systemPrompt = `你是一位资深占星师。你刚刚为用户生成了以下${label}。现在用户想针对报告内容进行追问。
+    const systemPrompt = `你是占星师，基于下方${label}和星盘数据回答追问。引用具体数据（度数、宫位、相位），200-400字，markdown格式。
 
-## 你生成的报告
+## 报告
 ${reportContent}
 
-## 用户的星盘原始数据
-${JSON.stringify(chartData, null, 2)}
+## 星盘数据
+${JSON.stringify(chartData)}
 
-## 回答规则
-- 基于上述报告和星盘数据精准回答用户的问题
-- 必须引用具体的星盘数据（度数、宫位、相位、容许度）
-- 如果用户问到报告中提到的概念，深入解释其占星学含义
-- 如果用户问到报告未涉及的方面，也可以基于星盘数据补充分析
-- 回答简洁精准，200-400字为宜
-- 使用温和专业的语气
-- 使用 markdown 格式
-- 每个回答末尾附上2-3个推荐追问，格式为：
-
+每个回答末尾附：
 [推荐追问]
 1. 问题一
 2. 问题二

@@ -59,10 +59,10 @@ function getDignity(planet: string, sign: string): string {
   return '';
 }
 
-const SIGN_RULER: Record<string, string> = {
-  '白羊': '火星', '金牛': '金星', '双子': '水星', '巨蟹': '月亮',
-  '狮子': '太阳', '处女': '水星', '天秤': '金星', '天蝎': '冥王星',
-  '射手': '木星', '摩羯': '土星', '水瓶': '天王星', '双鱼': '海王星',
+const SIGN_RULERS: Record<string, string[]> = {
+  '白羊': ['火星'], '金牛': ['金星'], '双子': ['水星'], '巨蟹': ['月亮'],
+  '狮子': ['太阳'], '处女': ['水星'], '天秤': ['金星'], '天蝎': ['冥王星', '火星'],
+  '射手': ['木星'], '摩羯': ['土星'], '水瓶': ['天王星', '土星'], '双鱼': ['海王星', '木星'],
 };
 
 /* ─── Math ─── */
@@ -249,11 +249,13 @@ export function NatalChartSVG({ chart }: { chart: AstrologyChart }) {
 export function ParamsDisplay({ chart }: { chart: AstrologyChart }) {
   const { planets, houses } = chart;
 
-  function getRulerHouse(sign: string): { ruler: string; house: number } {
-    const ruler = SIGN_RULER[sign];
-    if (!ruler) return { ruler: '-', house: 0 };
-    const p = planets.find(pl => pl.name === ruler);
-    return { ruler, house: p?.house || 0 };
+  function getRulers(sign: string): { name: string; house: number }[] {
+    const rulers = SIGN_RULERS[sign];
+    if (!rulers) return [];
+    return rulers.map(r => {
+      const p = planets.find(pl => pl.name === r);
+      return { name: r, house: p?.house || 0 };
+    });
   }
 
   return (
@@ -305,7 +307,7 @@ export function ParamsDisplay({ chart }: { chart: AstrologyChart }) {
           <tbody>
             {houses.map((h, i) => {
               const signIdx = SIGNS_CN.indexOf(h.sign);
-              const { ruler, house: rulerHouse } = getRulerHouse(h.sign);
+              const rulers = getRulers(h.sign);
               return (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                   <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-primary)' }}>
@@ -317,8 +319,8 @@ export function ParamsDisplay({ chart }: { chart: AstrologyChart }) {
                   </td>
                   <td className="px-3 py-2"><span className="flex items-center gap-1"><span style={{ color: signIdx >= 0 ? SIGN_ELEMENT_COLORS[signIdx] : '#888' }}>{signIdx >= 0 ? SIGN_GLYPHS[signIdx] : ''}</span><span className="text-xs" style={{ color: 'var(--text-primary)' }}>{h.sign}</span></span></td>
                   <td className="px-3 py-2 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>{h.degree}°{String(h.minute).padStart(2, '0')}&apos;</td>
-                  <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>{PLANET_GLYPHS[ruler] || ''} {ruler}</td>
-                  <td className="px-3 py-2 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>{rulerHouse > 0 ? `${rulerHouse}宫` : '-'}</td>
+                  <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>{rulers.map((r, j) => <span key={j}>{j > 0 && <span style={{ color: 'var(--text-tertiary)' }}> / </span>}{PLANET_GLYPHS[r.name] || ''} {r.name}</span>)}</td>
+                  <td className="px-3 py-2 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>{rulers.length > 0 ? rulers.map(r => r.house > 0 ? `${r.house}宫` : '-').join('、') : '-'}</td>
                 </tr>
               );
             })}
@@ -632,7 +634,7 @@ export function ReturnDetailPanel({ chartType, chart, returnMoment, nextReturn }
   const mcSignIndex = Math.floor(normalize(chart.midheaven) / 30);
   const mcSign = SIGNS_CN[mcSignIndex] + '座';
 
-  const ascRulerName = SIGN_RULER[SIGNS_CN[ascSignIndex]];
+  const ascRulerName = SIGN_RULERS[SIGNS_CN[ascSignIndex]]?.[0];
   const ascRuler = ascRulerName ? chart.planets.find(p => p.name === ascRulerName) : null;
 
   const sunP = chart.planets.find(p => p.name === '太阳');

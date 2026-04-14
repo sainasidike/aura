@@ -74,29 +74,78 @@ function parseInterpretations(text: string): Record<string, string> {
   return result;
 }
 
+const INTERP_SECTIONS = [
+  { marker: "📌", label: "核心判断", color: "#7b6cb8", bg: "rgba(123,108,184,0.06)" },
+  { marker: "💡", label: "积极建议", color: "#4bc9a0", bg: "rgba(75,201,160,0.06)" },
+  { marker: "⚠️", label: "注意事项", color: "#f0a030", bg: "rgba(240,160,48,0.06)" },
+];
+
 function InterpretationText({ text }: { text: string }) {
-  // Merge all lines into a single continuous paragraph
-  const merged = text
-    .split("\n")
-    .map(l => l.trim())
-    .filter(Boolean)
-    .map(l => l.replace(/\*\*/g, ""))
-    .join(" ");
+  const cleaned = text.replace(/\*\*/g, "").replace(/#{1,6}\s*/g, "");
+
+  // 尝试按 📌 💡 ⚠️ 分段
+  const segments: { type: number; content: string }[] = [];
+  const markerPattern = /(📌|💡|⚠️)/g;
+  let lastIdx = 0;
+  let lastType = -1;
+  let match;
+
+  while ((match = markerPattern.exec(cleaned)) !== null) {
+    // 保存上一段
+    if (lastType >= 0) {
+      const content = cleaned.slice(lastIdx, match.index).trim();
+      if (content) segments.push({ type: lastType, content });
+    }
+    lastType = match[1] === "📌" ? 0 : match[1] === "💡" ? 1 : 2;
+    lastIdx = match.index + match[0].length;
+  }
+  // 最后一段
+  if (lastType >= 0) {
+    const content = cleaned.slice(lastIdx).trim();
+    if (content) segments.push({ type: lastType, content });
+  }
+
+  // 没有匹配到标记 → 回退到整段渲染
+  if (segments.length === 0) {
+    const merged = cleaned.split("\n").map(l => l.trim()).filter(Boolean).join(" ");
+    return (
+      <div
+        className="rounded-2xl px-4 py-3"
+        style={{ background: "rgba(123,108,184,0.04)", borderLeft: "3px solid var(--accent-primary)" }}
+      >
+        <p className="text-[0.8rem] leading-7" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}>
+          {merged}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className="rounded-2xl px-4 py-3"
-      style={{
-        background: "rgba(123,108,184,0.04)",
-        borderLeft: "3px solid var(--accent-primary)",
-      }}
-    >
-      <p
-        className="text-[0.8rem] leading-7"
-        style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}
-      >
-        {merged}
-      </p>
+    <div className="space-y-2">
+      {segments.map((seg, i) => {
+        const style = INTERP_SECTIONS[seg.type] || INTERP_SECTIONS[0];
+        const content = seg.content
+          .replace(/^[：:\s]*/, "")
+          .replace(/^核心判断[：:\s]*/i, "")
+          .replace(/^积极建议[：:\s]*/i, "")
+          .replace(/^注意事项[：:\s]*/i, "")
+          .split("\n").map(l => l.trim()).filter(Boolean).join(" ");
+        return (
+          <div
+            key={i}
+            className="rounded-xl px-3.5 py-2.5"
+            style={{ background: style.bg, borderLeft: `3px solid ${style.color}` }}
+          >
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-xs">{style.marker}</span>
+              <span className="text-[0.65rem] font-bold" style={{ color: style.color }}>{style.label}</span>
+            </div>
+            <p className="text-[0.8rem] leading-7" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}>
+              {content}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }

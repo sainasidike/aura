@@ -108,7 +108,7 @@ function InterpretationText({ text }: { text: string }) {
 export default function FortunePage() {
   const [persons, setPersons] = useState<StoredProfile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [period, setPeriod] = useState<string | null>(null);
+  const [period, setPeriod] = useState<string | null>("daily");
   const [fortune, setFortune] = useState<FortuneData | null>(null);
   const [loading, setLoading] = useState(false);
   const [interpretations, setInterpretations] = useState<Record<string, string>>({});
@@ -314,44 +314,7 @@ export default function FortunePage() {
         onAdd={() => router.push("/profile?showForm=true")}
       />
 
-      {/* ─── 未选择运势类型：展示 4 张卡片 ─── */}
-      {!period && (
-        <motion.div
-          className="mt-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <p className="mb-5 text-center text-sm" style={{ color: "var(--text-tertiary)" }}>
-            选择运势类型，开始星盘解读
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {PERIODS.map((p, i) => (
-              <motion.button
-                key={p.key}
-                onClick={() => handlePeriodChange(p.key)}
-                className="flex flex-col items-start gap-1.5 rounded-2xl p-5 text-left"
-                style={{
-                  background: "var(--gradient-card)",
-                  border: "1px solid var(--border-subtle)",
-                  boxShadow: "var(--shadow-sm)",
-                }}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07, duration: 0.35 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                <span className="text-2xl" style={{ color: "var(--accent-primary)" }}>{p.icon}</span>
-                <span className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{p.label}</span>
-                <span className="rounded-full px-2 py-0.5 text-[0.6rem] font-medium" style={{ background: "var(--accent-primary-dim)", color: "var(--accent-primary)" }}>{p.basis}</span>
-                <span className="mt-1 text-[0.7rem] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>{p.desc}</span>
-              </motion.button>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* ─── 已选择运势类型：展示 tabs + 内容 ─── */}
+      {/* ─── 运势内容 ─── */}
       {period && (
         <>
           {/* Period tabs */}

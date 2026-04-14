@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProfiles, type StoredProfile } from "@/lib/storage";
 import { getGlossaryEntry } from "@/lib/astrology-glossary";
+import { ALL_CARDS, type TarotCard } from "@/lib/tarot-data";
+import { SPREADS } from "@/lib/tarot-spreads";
 import PersonSelector from "@/components/ui/PersonSelector";
 import Link from "next/link";
 
@@ -112,6 +114,15 @@ export default function FortunePage() {
   const abortRef = useRef<AbortController | null>(null);
   const router = useRouter();
 
+  // ── 今日塔罗 ──
+  const [tarotCard, setTarotCard] = useState<TarotCard | null>(null);
+  const [tarotReversed, setTarotReversed] = useState(false);
+  const [tarotFlipped, setTarotFlipped] = useState(false);
+  const [tarotText, setTarotText] = useState("");
+  const [tarotLoading, setTarotLoading] = useState(false);
+  const [tarotDone, setTarotDone] = useState(false);
+  const tarotAbortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     const ps = getProfiles();
     setPersons(ps);
@@ -126,6 +137,13 @@ export default function FortunePage() {
     setInterpretations({});
     setInterpretDone(false);
     abortRef.current?.abort();
+    // 重置塔罗
+    tarotAbortRef.current?.abort();
+    setTarotCard(null);
+    setTarotReversed(false);
+    setTarotFlipped(false);
+    setTarotText("");
+    setTarotDone(false);
   }, [activeId]);
 
   const now = new Date();
@@ -254,6 +272,117 @@ export default function FortunePage() {
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fortune, activePerson?.id, period, dateStr]);
+
+  // ── 今日塔罗：恢复缓存 ──
+  useEffect(() => {
+    if (!activeId || period !== 'daily') return;
+    const tarotKey = `tarot_daily_${activeId}_${dateStr}`;
+    const cached = localStorage.getItem(tarotKey);
+    if (cached) {
+      try {
+        const { cardId, isReversed, text } = JSON.parse(cached);
+        const card = ALL_CARDS.find(c => c.id === cardId);
+        if (card) {
+          setTarotCard(card);
+          setTarotReversed(isReversed);
+          setTarotFlipped(true);
+          setTarotText(text || "");
+          setTarotDone(!!text);
+        }
+      } catch { /* ignore */ }
+    } else {
+      setTarotCard(null);
+      setTarotFlipped(false);
+      setTarotText("");
+      setTarotDone(false);
+    }
+  }, [activeId, period, dateStr]);
+
+  // ── 今日塔罗：抽牌 ──
+  const drawTarot = useCallback(async () => {
+    if (!activeId) return;
+    // 随机抽牌
+    const card = ALL_CARDS[Math.floor(Math.random() * ALL_CARDS.length)];
+    const isReversed = Math.random() < 0.5;
+    setTarotCard(card);
+    setTarotReversed(isReversed);
+    setTarotText("");
+    setTarotDone(false);
+
+    // 翻牌动画延迟
+    setTimeout(() => setTarotFlipped(true), 100);
+
+    // 调用 AI 解读
+    tarotAbortRef.current?.abort();
+    const controller = new AbortController();
+    tarotAbortRef.current = controller;
+    setTarotLoading(true);
+
+    const spread = SPREADS.single;
+    const cardPayload = [{
+      name: card.name,
+      nameEn: card.nameEn,
+      position: spread.positions[0].name,
+      positionMeaning: spread.positions[0].meaning,
+      isReversed,
+      upright: card.upright,
+      reversed: card.reversed,
+      uprightDesc: card.uprightDesc,
+      reversedDesc: card.reversedDesc,
+    }];
+
+    try {
+      const res = await fetch('/api/tarot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: '今日运势指引：请结合这张塔罗牌为我解读今天的整体运势、需要注意的事项和建议',
+          cards: cardPayload,
+          spread: { name: spread.name, description: spread.description },
+        }),
+        signal: controller.signal,
+      });
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              fullText += parsed.content;
+              setTarotText(fullText);
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      // 缓存结果
+      if (fullText) {
+        const tarotKey = `tarot_daily_${activeId}_${dateStr}`;
+        localStorage.setItem(tarotKey, JSON.stringify({ cardId: card.id, isReversed, text: fullText }));
+      }
+      setTarotDone(true);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name !== 'AbortError') console.error(e);
+    } finally {
+      setTarotLoading(false);
+    }
+  }, [activeId, dateStr]);
 
   const dateLabel =
     period === "daily" ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`
@@ -521,6 +650,198 @@ export default function FortunePage() {
                 <motion.p className="text-center text-[0.65rem] py-3" style={{ color: "var(--text-tertiary)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
                   以上解读基于占星学和命理学传统，仅供参考和娱乐
                 </motion.p>
+              )}
+
+              {/* ── 今日塔罗 (仅日运模式) ── */}
+              {period === 'daily' && (
+                <motion.div
+                  className="mt-2 overflow-hidden rounded-2xl"
+                  style={{
+                    background: "var(--bg-base)",
+                    border: "1px solid var(--border-subtle)",
+                    boxShadow: "var(--shadow-sm)",
+                  }}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.4 }}
+                >
+                  {/* Header */}
+                  <div
+                    className="flex items-center gap-3 px-4 py-3.5"
+                    style={{ background: "linear-gradient(135deg, rgba(192,132,252,0.10), rgba(192,132,252,0.03))" }}
+                  >
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
+                      style={{ background: "rgba(192,132,252,0.12)", color: "#c084fc" }}
+                    >
+                      🃏
+                    </div>
+                    <span className="flex-1 text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                      今日塔罗指引
+                    </span>
+                    {tarotCard && tarotFlipped && (
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-[0.6rem] font-medium"
+                        style={{
+                          background: tarotReversed ? "rgba(232,93,93,0.10)" : "rgba(75,201,160,0.10)",
+                          color: tarotReversed ? "#e85d5d" : "#2da89e",
+                        }}
+                      >
+                        {tarotReversed ? "逆位" : "正位"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="px-4 pb-5 pt-3">
+                    {/* 未抽牌 */}
+                    {!tarotCard && (
+                      <div className="flex flex-col items-center gap-4 py-4">
+                        <div
+                          className="flex h-32 w-20 items-center justify-center rounded-xl text-2xl"
+                          style={{
+                            background: "linear-gradient(135deg, #2d1b69, #4a2d8a)",
+                            border: "2px solid rgba(192,132,252,0.3)",
+                            boxShadow: "0 4px 20px rgba(45,27,105,0.3)",
+                          }}
+                        >
+                          <span style={{ opacity: 0.6 }}>✦</span>
+                        </div>
+                        <motion.button
+                          onClick={drawTarot}
+                          className="rounded-full px-6 py-2.5 text-xs font-semibold text-white"
+                          style={{
+                            background: "linear-gradient(135deg, #7b6cb8, #c084fc)",
+                            boxShadow: "0 4px 16px rgba(192,132,252,0.25)",
+                          }}
+                          whileTap={{ scale: 0.95 }}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          ✨ 抽一张塔罗看今日指引
+                        </motion.button>
+                      </div>
+                    )}
+
+                    {/* 已抽牌：翻牌 + 解读 */}
+                    {tarotCard && (
+                      <div className="flex flex-col items-center gap-4">
+                        {/* 牌面 */}
+                        <div style={{ perspective: 600 }} className="my-2">
+                          <motion.div
+                            style={{
+                              width: 80, height: 128, position: "relative",
+                              transformStyle: "preserve-3d",
+                            }}
+                            initial={{ rotateY: 180 }}
+                            animate={{ rotateY: tarotFlipped ? 0 : 180 }}
+                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                          >
+                            {/* 正面（牌面） */}
+                            <div
+                              className="absolute inset-0 flex flex-col items-center justify-center rounded-xl"
+                              style={{
+                                backfaceVisibility: "hidden",
+                                background: "linear-gradient(135deg, rgba(192,132,252,0.08), rgba(123,108,184,0.04))",
+                                border: "2px solid rgba(192,132,252,0.25)",
+                              }}
+                            >
+                              <span className="text-3xl">{tarotCard.emoji}</span>
+                              <span
+                                className="mt-1.5 text-[0.6rem] font-bold text-center leading-tight px-1"
+                                style={{ color: "var(--text-primary)" }}
+                              >
+                                {tarotCard.name}
+                              </span>
+                            </div>
+                            {/* 背面（牌背） */}
+                            <div
+                              className="absolute inset-0 flex items-center justify-center rounded-xl"
+                              style={{
+                                backfaceVisibility: "hidden",
+                                transform: "rotateY(180deg)",
+                                background: "linear-gradient(135deg, #2d1b69, #4a2d8a)",
+                                border: "2px solid rgba(192,132,252,0.3)",
+                              }}
+                            >
+                              <span style={{ opacity: 0.6, fontSize: 24 }}>✦</span>
+                            </div>
+                          </motion.div>
+                        </div>
+
+                        {/* 牌名 + 关键词 */}
+                        <AnimatePresence>
+                          {tarotFlipped && (
+                            <motion.div
+                              className="flex flex-col items-center gap-1.5 w-full"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.3, duration: 0.4 }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                                  {tarotCard.emoji} {tarotCard.name}
+                                </span>
+                                <span className="text-[0.6rem]" style={{ color: "var(--text-tertiary)" }}>
+                                  {tarotCard.nameEn}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap justify-center gap-1.5">
+                                {(tarotReversed ? tarotCard.reversed : tarotCard.upright)
+                                  .split('、')
+                                  .map((kw, i) => (
+                                    <span
+                                      key={i}
+                                      className="rounded-full px-2 py-0.5 text-[0.6rem]"
+                                      style={{
+                                        background: tarotReversed ? "rgba(232,93,93,0.08)" : "rgba(75,201,160,0.08)",
+                                        color: tarotReversed ? "#e85d5d" : "#2da89e",
+                                      }}
+                                    >
+                                      {kw}
+                                    </span>
+                                  ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* AI 解读 */}
+                        {tarotFlipped && (tarotText || tarotLoading) && (
+                          <motion.div
+                            className="w-full rounded-2xl px-4 py-3 mt-1"
+                            style={{
+                              background: "rgba(192,132,252,0.04)",
+                              borderLeft: "3px solid #c084fc",
+                            }}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.5, duration: 0.4 }}
+                          >
+                            {tarotText ? (
+                              <p
+                                className="text-[0.8rem] leading-7 whitespace-pre-wrap"
+                                style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}
+                              >
+                                {tarotText}
+                              </p>
+                            ) : (
+                              <div className="flex items-center gap-2 animate-shimmer">
+                                <span className="text-xs" style={{ color: "#c084fc" }}>
+                                  ✨ 正在解读塔罗牌...
+                                </span>
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {tarotDone && (
+                          <p className="text-[0.6rem] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                            塔罗指引仅供参考和娱乐
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               )}
             </div>
           )}

@@ -529,9 +529,16 @@ export default function FortunePage() {
           </div>
 
           {/* ── 日期导航 ── */}
-          <div className="mb-4 space-y-2.5">
+          <div
+            className="mb-5 rounded-2xl p-3 space-y-3"
+            style={{
+              background: "var(--bg-base)",
+              border: "1px solid var(--border-subtle)",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
             {/* 箭头导航行 */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center">
               <motion.button
                 onClick={() => {
                   if (period === 'daily') { if (canDailyPrev) setWeekOffset(o => o - 1); }
@@ -539,20 +546,19 @@ export default function FortunePage() {
                   else if (period === 'monthly') { if (canMonthlyPrev) setMonthOffset(o => o - 1); }
                   else if (period === 'yearly') { if (canYearlyPrev) setYearOffset(o => o - 1); }
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold"
                 style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-tertiary)",
-                  opacity: (period === 'daily' ? canDailyPrev : period === 'weekly' ? canWeeklyPrev : period === 'monthly' ? canMonthlyPrev : canYearlyPrev) ? 1 : 0.3,
+                  background: "var(--accent-primary-dim)",
+                  color: "var(--accent-primary)",
+                  opacity: (period === 'daily' ? canDailyPrev : period === 'weekly' ? canWeeklyPrev : period === 'monthly' ? canMonthlyPrev : canYearlyPrev) ? 1 : 0.25,
                 }}
-                whileTap={{ scale: 0.9 }}
+                whileTap={{ scale: 0.85 }}
               >
                 ‹
               </motion.button>
 
-              <div className="flex flex-1 items-center justify-center gap-2">
-                <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{dateLabel}</span>
+              <div className="flex flex-1 flex-col items-center gap-1">
+                <span className="text-[0.85rem] font-bold" style={{ color: "var(--text-primary)" }}>{dateLabel}</span>
                 {fortune?.chartType && (
                   <span className="rounded-full px-2 py-0.5 text-[0.55rem] font-medium" style={{ background: "var(--accent-primary-dim)", color: "var(--accent-primary)" }}>
                     {fortune.chartType === 'transit' ? '行运盘' : fortune.chartType === 'solar_return' ? '日返盘' : '月返盘'}
@@ -567,23 +573,24 @@ export default function FortunePage() {
                   else if (period === 'monthly') { if (canMonthlyNext) setMonthOffset(o => o + 1); }
                   else if (period === 'yearly') { if (canYearlyNext) setYearOffset(o => o + 1); }
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold"
                 style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-tertiary)",
-                  opacity: (period === 'daily' ? canDailyNext : period === 'weekly' ? canWeeklyNext : period === 'monthly' ? canMonthlyNext : canYearlyNext) ? 1 : 0.3,
+                  background: "var(--accent-primary-dim)",
+                  color: "var(--accent-primary)",
+                  opacity: (period === 'daily' ? canDailyNext : period === 'weekly' ? canWeeklyNext : period === 'monthly' ? canMonthlyNext : canYearlyNext) ? 1 : 0.25,
                 }}
-                whileTap={{ scale: 0.9 }}
+                whileTap={{ scale: 0.85 }}
               >
                 ›
               </motion.button>
+            </div>
 
-              {/* "回到今天"按钮 — 偏移不为0时显示 */}
-              {((period === 'daily' && weekOffset !== 0) ||
-                (period === 'weekly' && weeklyOffset !== 0) ||
-                (period === 'monthly' && monthOffset !== 0) ||
-                (period === 'yearly' && yearOffset !== 0)) && (
+            {/* "回到今天"按钮 — 偏移不为0时显示 */}
+            {((period === 'daily' && weekOffset !== 0) ||
+              (period === 'weekly' && weeklyOffset !== 0) ||
+              (period === 'monthly' && monthOffset !== 0) ||
+              (period === 'yearly' && yearOffset !== 0)) && (
+              <motion.div className="flex justify-center">
                 <motion.button
                   onClick={() => {
                     if (period === 'daily') { setWeekOffset(0); setSelectedDate(new Date(today)); }
@@ -591,19 +598,20 @@ export default function FortunePage() {
                     else if (period === 'monthly') setMonthOffset(0);
                     else if (period === 'yearly') setYearOffset(0);
                   }}
-                  className="rounded-full px-2.5 py-1 text-[0.6rem] font-medium"
+                  className="rounded-full px-4 py-1.5 text-xs font-semibold"
                   style={{
-                    background: "var(--accent-primary-dim)",
-                    color: "var(--accent-primary)",
+                    background: "var(--gradient-primary)",
+                    color: "white",
+                    boxShadow: "0 2px 8px rgba(123,108,184,0.20)",
                   }}
                   whileTap={{ scale: 0.9 }}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
                 >
-                  今
+                  回到今天
                 </motion.button>
-              )}
-            </div>
+              </motion.div>
+            )}
 
             {/* 日运：7天格子 */}
             <AnimatePresence>

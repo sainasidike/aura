@@ -595,8 +595,9 @@ function ChatContent() {
 
           {/* Messages */}
           {messages.map((msg, i) => {
-            // Check if this assistant message has card sections
-            const cardSections = msg.role === 'assistant' && msg.content && (!streaming || i < messages.length - 1)
+            // Check if this assistant message has card sections (including during streaming)
+            const isStreamingThis = streaming && i === messages.length - 1;
+            const cardSections = msg.role === 'assistant' && msg.content
               ? parseChatSections(msg.content)
               : null;
 
@@ -635,6 +636,8 @@ function ChatContent() {
                   <div className="space-y-3" onClick={handleGlossaryClick}>
                     {cardSections.map((sec, si) => {
                       const isSummary = sec.tag === 'SUMMARY';
+                      const isLastSection = si === cardSections.length - 1;
+                      const showStreamingDot = isStreamingThis && isLastSection;
                       return (
                         <div
                           key={si}
@@ -648,7 +651,7 @@ function ChatContent() {
                             boxShadow: isSummary
                               ? `0 4px 20px ${sec.color}15, var(--shadow-card)`
                               : 'var(--shadow-card)',
-                            animation: `fadeInUp 0.4s ease-out ${si * 0.08}s both`,
+                            animation: isStreamingThis ? 'none' : `fadeInUp 0.4s ease-out ${si * 0.08}s both`,
                           }}
                         >
                           {/* Card header */}
@@ -672,6 +675,13 @@ function ChatContent() {
                             <span className="text-[13px] font-semibold tracking-wide" style={{ color: sec.color }}>
                               {sec.title}
                             </span>
+                            {showStreamingDot && (
+                              <span className="ml-auto flex items-center gap-1">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color }} />
+                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.3s' }} />
+                                <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: sec.color, animationDelay: '0.6s' }} />
+                              </span>
+                            )}
                           </div>
                           {/* Card body with structured sub-sections */}
                           <div className="px-4 py-3 space-y-2.5">

@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
 import ShareModal from '@/components/ui/ShareModal';
+import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
+import { simpleMarkdown } from '@/lib/simple-markdown';
+import type { AstrologyChart } from '@/types';
 
 const LOVE_COLOR = '#d07090';
 
@@ -76,6 +79,43 @@ function CompatibilityContent() {
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [activeReportType, setActiveReportType] = useState<'synastry' | 'composite' | 'davison'>('synastry');
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Chart summaries for data cards
+  const compositeSummary = useMemo<ChartSummary | null>(() => {
+    if (!compositeData) return null;
+    try {
+      const d = compositeData as { composite: AstrologyChart };
+      if (d.composite?.planets) return extractChartSummary(d.composite);
+    } catch { /* */ }
+    return null;
+  }, [compositeData]);
+
+  const compositeAsc = useMemo(() => {
+    if (!compositeData) return null;
+    try {
+      const d = compositeData as { composite: AstrologyChart };
+      if (d.composite?.ascendant != null) return getAscendantInfo(d.composite);
+    } catch { /* */ }
+    return null;
+  }, [compositeData]);
+
+  const davisonSummary = useMemo<ChartSummary | null>(() => {
+    if (!davisonData) return null;
+    try {
+      const d = davisonData as { davison: AstrologyChart };
+      if (d.davison?.planets) return extractChartSummary(d.davison);
+    } catch { /* */ }
+    return null;
+  }, [davisonData]);
+
+  const davisonAsc = useMemo(() => {
+    if (!davisonData) return null;
+    try {
+      const d = davisonData as { davison: AstrologyChart };
+      if (d.davison?.ascendant != null) return getAscendantInfo(d.davison);
+    } catch { /* */ }
+    return null;
+  }, [davisonData]);
 
   // Cache helpers
   const cacheKeyBase = (selectedA && selectedB) ? `compat_${selectedA.id}_${selectedB.id}` : '';
@@ -775,26 +815,37 @@ function CompatibilityContent() {
           </div>
         )}
 
-        {/* Synastry report content */}
-        {report && (
-          <div
-            ref={contentRef}
-            className="animate-fadeIn prose-chat rounded-2xl p-6"
-            style={{
-              background: 'var(--bg-base)',
-              border: '1px solid var(--border-subtle)',
-              color: 'var(--text-secondary)',
-              boxShadow: 'var(--shadow-card)',
-            }}
-            dangerouslySetInnerHTML={{ __html: simpleMarkdown(report) }}
-          />
-        )}
-
-        {reportLoading && report && (
-          <div className="mt-3 flex justify-center">
-            <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
-          </div>
-        )}
+        {/* Synastry report content — card layout */}
+        {report && (() => {
+          const { preamble, sections } = parseReportSections(report);
+          const icons = SECTION_ICONS.synastry;
+          return (
+            <div ref={contentRef} className="space-y-3 animate-fadeIn">
+              {preamble && (
+                <div className="prose-chat rounded-2xl p-5" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-card)' }}
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdown(preamble) }} />
+              )}
+              {sections.map((sec, i) => {
+                const ic = icons[i] || icons[0];
+                return (
+                  <div key={i} className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+                    <div className="flex items-center gap-2.5 px-5 pt-4 pb-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm" style={{ background: `${ic.color}15`, color: ic.color }}>{ic.icon}</span>
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{sec.title}</span>
+                    </div>
+                    <div className="prose-chat px-5 pb-4" style={{ color: 'var(--text-secondary)' }}
+                      dangerouslySetInnerHTML={{ __html: simpleMarkdown(sec.content) }} />
+                  </div>
+                );
+              })}
+              {reportLoading && (
+                <div className="flex justify-center py-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Share buttons */}
         {report && !reportLoading && (
@@ -880,13 +931,63 @@ function CompatibilityContent() {
                       <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>AI 正在分析组合盘...</p>
                     </div>
                   )}
-                  {compositeReport && (
-                    <div
-                      className="prose-chat p-5"
-                      style={{ color: 'var(--text-secondary)' }}
-                      dangerouslySetInnerHTML={{ __html: simpleMarkdown(compositeReport) }}
-                    />
+                  {/* Composite data summary */}
+                  {compositeSummary && (
+                    <div className="mx-5 mt-4 mb-2 rounded-xl p-3" style={{ background: '#9070b006', border: '1px solid #9070b018' }}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                          style={{ background: `conic-gradient(#9070b0 ${compositeSummary.harmonyScore * 3.6}deg, #9070b015 0deg)` }}>
+                          <div className="flex h-9 w-9 flex-col items-center justify-center rounded-full" style={{ background: 'var(--bg-base)' }}>
+                            <span className="text-sm font-bold" style={{ color: '#9070b0' }}>{compositeSummary.harmonyScore}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 text-[10px] space-y-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                          <div>相位 {compositeSummary.totalAspects} · 和谐 {compositeSummary.harmoniousCount} · 张力 {compositeSummary.tenseCount}</div>
+                          <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: '#d0404020' }}>
+                            <div className="h-full rounded-full" style={{
+                              width: `${compositeSummary.totalAspects > 0 ? Math.round(compositeSummary.harmoniousCount / (compositeSummary.harmoniousCount + compositeSummary.tenseCount) * 100) : 50}%`,
+                              background: '#4a9060',
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {compositeAsc && (
+                          <span className="text-[10px] rounded px-1.5 py-0.5" style={{ background: '#9070b010', color: 'var(--text-secondary)' }}>ASC {compositeAsc.signGlyph}{compositeAsc.sign} {compositeAsc.degree}°</span>
+                        )}
+                        {compositeSummary.keyPlanets.slice(0, 4).map(p => (
+                          <span key={p.name} className="text-[10px] rounded px-1.5 py-0.5" style={{ background: '#9070b010', color: 'var(--text-secondary)' }}>
+                            {p.glyph}{p.sign} {formatDegree(p.degree, p.minute)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
+                  {compositeReport && (() => {
+                    const { preamble, sections } = parseReportSections(compositeReport);
+                    const icons = SECTION_ICONS.composite;
+                    return (
+                      <div className="space-y-2 p-4">
+                        {preamble && (
+                          <div className="prose-chat text-sm" style={{ color: 'var(--text-secondary)' }}
+                            dangerouslySetInnerHTML={{ __html: simpleMarkdown(preamble) }} />
+                        )}
+                        {sections.map((sec, i) => {
+                          const ic = icons[i] || icons[0];
+                          return (
+                            <div key={i} className="rounded-xl p-3" style={{ background: '#9070b006', border: '1px solid #9070b012' }}>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-xs" style={{ color: ic.color }}>{ic.icon}</span>
+                                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{sec.title}</span>
+                              </div>
+                              <div className="prose-chat text-sm" style={{ color: 'var(--text-secondary)' }}
+                                dangerouslySetInnerHTML={{ __html: simpleMarkdown(sec.content) }} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   {compositeLoading && compositeReport && (
                     <div className="flex justify-center pb-4">
                       <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: '#9070b0' }} />
@@ -948,13 +1049,63 @@ function CompatibilityContent() {
                       <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>AI 正在分析时空中点盘...</p>
                     </div>
                   )}
-                  {davisonReport && (
-                    <div
-                      className="prose-chat p-5"
-                      style={{ color: 'var(--text-secondary)' }}
-                      dangerouslySetInnerHTML={{ __html: simpleMarkdown(davisonReport) }}
-                    />
+                  {/* Davison data summary */}
+                  {davisonSummary && (
+                    <div className="mx-5 mt-4 mb-2 rounded-xl p-3" style={{ background: '#5090d006', border: '1px solid #5090d018' }}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                          style={{ background: `conic-gradient(#5090d0 ${davisonSummary.harmonyScore * 3.6}deg, #5090d015 0deg)` }}>
+                          <div className="flex h-9 w-9 flex-col items-center justify-center rounded-full" style={{ background: 'var(--bg-base)' }}>
+                            <span className="text-sm font-bold" style={{ color: '#5090d0' }}>{davisonSummary.harmonyScore}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 text-[10px] space-y-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                          <div>相位 {davisonSummary.totalAspects} · 和谐 {davisonSummary.harmoniousCount} · 张力 {davisonSummary.tenseCount}</div>
+                          <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: '#d0404020' }}>
+                            <div className="h-full rounded-full" style={{
+                              width: `${davisonSummary.totalAspects > 0 ? Math.round(davisonSummary.harmoniousCount / (davisonSummary.harmoniousCount + davisonSummary.tenseCount) * 100) : 50}%`,
+                              background: '#4a9060',
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {davisonAsc && (
+                          <span className="text-[10px] rounded px-1.5 py-0.5" style={{ background: '#5090d010', color: 'var(--text-secondary)' }}>ASC {davisonAsc.signGlyph}{davisonAsc.sign} {davisonAsc.degree}°</span>
+                        )}
+                        {davisonSummary.keyPlanets.slice(0, 4).map(p => (
+                          <span key={p.name} className="text-[10px] rounded px-1.5 py-0.5" style={{ background: '#5090d010', color: 'var(--text-secondary)' }}>
+                            {p.glyph}{p.sign} {formatDegree(p.degree, p.minute)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
+                  {davisonReport && (() => {
+                    const { preamble, sections } = parseReportSections(davisonReport);
+                    const icons = SECTION_ICONS.davison;
+                    return (
+                      <div className="space-y-2 p-4">
+                        {preamble && (
+                          <div className="prose-chat text-sm" style={{ color: 'var(--text-secondary)' }}
+                            dangerouslySetInnerHTML={{ __html: simpleMarkdown(preamble) }} />
+                        )}
+                        {sections.map((sec, i) => {
+                          const ic = icons[i] || icons[0];
+                          return (
+                            <div key={i} className="rounded-xl p-3" style={{ background: '#5090d006', border: '1px solid #5090d012' }}>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-xs" style={{ color: ic.color }}>{ic.icon}</span>
+                                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{sec.title}</span>
+                              </div>
+                              <div className="prose-chat text-sm" style={{ color: 'var(--text-secondary)' }}
+                                dangerouslySetInnerHTML={{ __html: simpleMarkdown(sec.content) }} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   {davisonLoading && davisonReport && (
                     <div className="flex justify-center pb-4">
                       <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: '#5090d0' }} />
@@ -1131,17 +1282,3 @@ function CompatibilityContent() {
   );
 }
 
-function simpleMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^\- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
-    .replace(/^/, '<p>').replace(/$/, '</p>');
-}

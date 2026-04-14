@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
+import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
+import { simpleMarkdown } from '@/lib/simple-markdown';
+import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#9070b0';
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -31,6 +34,24 @@ function CompositeContent() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const cacheKey = (selectedA && selectedB) ? `composite_${selectedA.id}_${selectedB.id}` : '';
+
+  const chartSummary = useMemo<ChartSummary | null>(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { composite: AstrologyChart };
+      if (d.composite?.planets) return extractChartSummary(d.composite);
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
+
+  const ascInfo = useMemo(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { composite: AstrologyChart };
+      if (d.composite?.ascendant != null) return getAscendantInfo(d.composite);
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
 
   useEffect(() => {
     const ps = getProfiles();
@@ -253,17 +274,95 @@ function CompositeContent() {
           </div>
         )}
 
-        {report && (
-          <div ref={contentRef} className="animate-fadeIn prose-chat rounded-2xl p-6"
-            style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-card)' }}
-            dangerouslySetInnerHTML={{ __html: simpleMarkdown(report) }} />
-        )}
+        {/* Data Summary Card */}
+        {chartSummary && (
+          <div className="mb-4 animate-fadeIn rounded-2xl p-4" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+            {/* Score Ring + Stats */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full"
+                style={{ background: `conic-gradient(${ACCENT} ${chartSummary.harmonyScore * 3.6}deg, ${ACCENT}15 0deg)` }}>
+                <div className="flex h-16 w-16 flex-col items-center justify-center rounded-full" style={{ background: 'var(--bg-base)' }}>
+                  <span className="text-xl font-bold" style={{ color: ACCENT, fontFamily: 'var(--font-display)' }}>{chartSummary.harmonyScore}</span>
+                  <span className="text-[9px]" style={{ color: 'var(--text-tertiary)' }}>和谐度</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--text-tertiary)' }}>行星</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{chartSummary.totalPlanets} 颗</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--text-tertiary)' }}>相位</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{chartSummary.totalAspects} 个</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: '#4a9060' }} />
+                    <span style={{ color: 'var(--text-tertiary)' }}>和谐 {chartSummary.harmoniousCount}</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: '#d04040' }} />
+                    <span style={{ color: 'var(--text-tertiary)' }}>张力 {chartSummary.tenseCount}</span>
+                  </span>
+                </div>
+                {/* Harmony bar */}
+                <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: '#d0404020' }}>
+                  <div className="h-full rounded-full" style={{
+                    width: `${chartSummary.totalAspects > 0 ? Math.round(chartSummary.harmoniousCount / (chartSummary.harmoniousCount + chartSummary.tenseCount) * 100) : 50}%`,
+                    background: '#4a9060',
+                  }} />
+                </div>
+              </div>
+            </div>
 
-        {loading && report && (
-          <div className="mt-3 flex justify-center">
-            <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: ACCENT }} />
+            {/* Key Planets */}
+            <div className="flex flex-wrap gap-2">
+              {ascInfo && (
+                <div className="flex items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ background: `${ACCENT}08`, border: `1px solid ${ACCENT}18` }}>
+                  <span className="text-xs font-medium" style={{ color: ACCENT }}>ASC</span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{ascInfo.signGlyph} {ascInfo.sign} {ascInfo.degree}°</span>
+                </div>
+              )}
+              {chartSummary.keyPlanets.map(p => (
+                <div key={p.name} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ background: `${ACCENT}08`, border: `1px solid ${ACCENT}18` }}>
+                  <span className="text-xs" style={{ color: ACCENT }}>{p.glyph}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{p.signGlyph} {p.sign} {formatDegree(p.degree, p.minute)}{p.retrograde ? ' ℞' : ''}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {report && (() => {
+          const { preamble, sections } = parseReportSections(report);
+          const icons = SECTION_ICONS.composite;
+          return (
+            <div ref={contentRef} className="space-y-3 animate-fadeIn">
+              {preamble && (
+                <div className="prose-chat rounded-2xl p-5" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-card)' }}
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdown(preamble) }} />
+              )}
+              {sections.map((sec, i) => {
+                const ic = icons[i] || icons[0];
+                return (
+                  <div key={i} className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+                    <div className="flex items-center gap-2.5 px-5 pt-4 pb-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm" style={{ background: `${ic.color}15`, color: ic.color }}>{ic.icon}</span>
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{sec.title}</span>
+                    </div>
+                    <div className="prose-chat px-5 pb-4" style={{ color: 'var(--text-secondary)' }}
+                      dangerouslySetInnerHTML={{ __html: simpleMarkdown(sec.content) }} />
+                  </div>
+                );
+              })}
+              {loading && (
+                <div className="flex justify-center py-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: ACCENT }} />
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {report && !loading && (
           <div className="mt-4 flex justify-center animate-fadeIn">
@@ -344,17 +443,3 @@ function CompositeContent() {
   );
 }
 
-function simpleMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^\- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
-    .replace(/^/, '<p>').replace(/$/, '</p>');
-}

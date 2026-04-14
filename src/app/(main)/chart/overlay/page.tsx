@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
+import { extractChartSummary, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
+import { simpleMarkdown } from '@/lib/simple-markdown';
+import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#c08050';
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -31,6 +34,20 @@ function OverlayContent() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const cacheKey = (selectedA && selectedB) ? `overlay_${selectedA.id}_${selectedB.id}` : '';
+
+  const overlaySummary = useMemo<{ aToB: ChartSummary; bToA: ChartSummary } | null>(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { overlayAtoB: AstrologyChart; overlayBtoA: AstrologyChart };
+      if (d.overlayAtoB?.planets && d.overlayBtoA?.planets) {
+        return {
+          aToB: extractChartSummary(d.overlayAtoB),
+          bToA: extractChartSummary(d.overlayBtoA),
+        };
+      }
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
 
   useEffect(() => {
     const ps = getProfiles();
@@ -252,17 +269,96 @@ function OverlayContent() {
           </div>
         )}
 
-        {report && (
-          <div ref={contentRef} className="animate-fadeIn prose-chat rounded-2xl p-6"
-            style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-card)' }}
-            dangerouslySetInnerHTML={{ __html: simpleMarkdown(report) }} />
-        )}
-
-        {loading && report && (
-          <div className="mt-3 flex justify-center">
-            <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: ACCENT }} />
+        {/* Data Summary Card */}
+        {overlaySummary && (
+          <div className="mb-4 animate-fadeIn rounded-2xl p-4" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+            <div className="grid grid-cols-2 gap-3">
+              {/* A → B */}
+              <div className="rounded-xl p-3" style={{ background: `${ACCENT}06` }}>
+                <p className="text-[10px] font-medium mb-2" style={{ color: ACCENT }}>{selectedA?.name} → {selectedB?.name}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                    style={{ background: `conic-gradient(${ACCENT} ${overlaySummary.aToB.harmonyScore * 3.6}deg, ${ACCENT}15 0deg)` }}>
+                    <div className="flex h-9 w-9 flex-col items-center justify-center rounded-full" style={{ background: 'var(--bg-base)' }}>
+                      <span className="text-sm font-bold" style={{ color: ACCENT }}>{overlaySummary.aToB.harmonyScore}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] space-y-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                    <div>相位 {overlaySummary.aToB.totalAspects}</div>
+                    <div className="flex gap-1.5">
+                      <span className="flex items-center gap-0.5"><span className="inline-block h-1 w-1 rounded-full" style={{ background: '#4a9060' }} />{overlaySummary.aToB.harmoniousCount}</span>
+                      <span className="flex items-center gap-0.5"><span className="inline-block h-1 w-1 rounded-full" style={{ background: '#d04040' }} />{overlaySummary.aToB.tenseCount}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {overlaySummary.aToB.keyPlanets.slice(0, 3).map(p => (
+                    <span key={p.name} className="text-[10px] rounded px-1.5 py-0.5" style={{ background: `${ACCENT}10`, color: 'var(--text-secondary)' }}>
+                      {p.glyph} {p.sign} {p.degree}°
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {/* B → A */}
+              <div className="rounded-xl p-3" style={{ background: `${ACCENT}06` }}>
+                <p className="text-[10px] font-medium mb-2" style={{ color: ACCENT }}>{selectedB?.name} → {selectedA?.name}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                    style={{ background: `conic-gradient(${ACCENT} ${overlaySummary.bToA.harmonyScore * 3.6}deg, ${ACCENT}15 0deg)` }}>
+                    <div className="flex h-9 w-9 flex-col items-center justify-center rounded-full" style={{ background: 'var(--bg-base)' }}>
+                      <span className="text-sm font-bold" style={{ color: ACCENT }}>{overlaySummary.bToA.harmonyScore}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] space-y-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                    <div>相位 {overlaySummary.bToA.totalAspects}</div>
+                    <div className="flex gap-1.5">
+                      <span className="flex items-center gap-0.5"><span className="inline-block h-1 w-1 rounded-full" style={{ background: '#4a9060' }} />{overlaySummary.bToA.harmoniousCount}</span>
+                      <span className="flex items-center gap-0.5"><span className="inline-block h-1 w-1 rounded-full" style={{ background: '#d04040' }} />{overlaySummary.bToA.tenseCount}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {overlaySummary.bToA.keyPlanets.slice(0, 3).map(p => (
+                    <span key={p.name} className="text-[10px] rounded px-1.5 py-0.5" style={{ background: `${ACCENT}10`, color: 'var(--text-secondary)' }}>
+                      {p.glyph} {p.sign} {p.degree}°
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
+
+        {report && (() => {
+          const { preamble, sections } = parseReportSections(report);
+          const icons = SECTION_ICONS.overlay;
+          return (
+            <div ref={contentRef} className="space-y-3 animate-fadeIn">
+              {preamble && (
+                <div className="prose-chat rounded-2xl p-5" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-card)' }}
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdown(preamble) }} />
+              )}
+              {sections.map((sec, i) => {
+                const ic = icons[i] || icons[0];
+                return (
+                  <div key={i} className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+                    <div className="flex items-center gap-2.5 px-5 pt-4 pb-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm" style={{ background: `${ic.color}15`, color: ic.color }}>{ic.icon}</span>
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{sec.title}</span>
+                    </div>
+                    <div className="prose-chat px-5 pb-4" style={{ color: 'var(--text-secondary)' }}
+                      dangerouslySetInnerHTML={{ __html: simpleMarkdown(sec.content) }} />
+                  </div>
+                );
+              })}
+              {loading && (
+                <div className="flex justify-center py-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: ACCENT }} />
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {report && !loading && (
           <div className="mt-4 flex justify-center animate-fadeIn">
@@ -343,17 +439,3 @@ function OverlayContent() {
   );
 }
 
-function simpleMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^\- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
-    .replace(/^/, '<p>').replace(/$/, '</p>');
-}

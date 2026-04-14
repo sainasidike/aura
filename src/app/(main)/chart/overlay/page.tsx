@@ -9,6 +9,21 @@ import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#c08050';
+
+const PLANET_GLYPHS: Record<string, string> = {
+  '太阳': '☉', '月亮': '☽', '水星': '☿', '金星': '♀', '火星': '♂',
+  '木星': '♃', '土星': '♄', '天王星': '♅', '海王星': '♆', '冥王星': '♇', '北交点': '☊',
+};
+const PLANET_COLORS: Record<string, string> = {
+  '太阳': '#e0a020', '月亮': '#8090b0', '水星': '#60a060', '金星': '#d06088',
+  '火星': '#d04040', '木星': '#8060c0', '土星': '#606060', '天王星': '#40a0d0',
+  '海王星': '#6080c0', '冥王星': '#804060', '北交点': '#808080',
+};
+const HOUSE_SHORT: Record<number, string> = {
+  1: '命', 2: '财帛', 3: '兄弟', 4: '田宅', 5: '子女', 6: '奴仆',
+  7: '夫妻', 8: '疾厄', 9: '迁移', 10: '官禄', 11: '福德', 12: '玄秘',
+};
+
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 export default function OverlayPage() {
@@ -402,6 +417,49 @@ function OverlayContent() {
             <div className="flex justify-center p-4">
               <NatalChartSVG chart={overlayTab === 'aToB' ? overlayCharts.aToB : overlayCharts.bToA} hideAskAI />
             </div>
+            {/* Planet-House Grid */}
+            {(() => {
+              const currentChart = overlayTab === 'aToB' ? overlayCharts.aToB : overlayCharts.bToA;
+              return (
+                <div className="px-4 pb-4">
+                  <div className="text-[10px] font-medium mb-2.5" style={{ color: 'var(--text-tertiary)' }}>行星落宫分布</div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const h = i + 1;
+                      const planets = currentChart.planets.filter(p => p.house === h);
+                      const hot = planets.length >= 2;
+                      return (
+                        <div key={h} className="rounded-lg p-1.5 text-center" style={{
+                          background: hot ? `${ACCENT}12` : planets.length > 0 ? `${ACCENT}06` : 'var(--bg-surface)',
+                          border: hot ? `1px solid ${ACCENT}25` : '1px solid transparent',
+                          minHeight: 48,
+                        }}>
+                          <div className="text-[9px] leading-tight" style={{ color: 'var(--text-tertiary)' }}>
+                            {h}宫 <span className="opacity-60">{HOUSE_SHORT[h]}</span>
+                          </div>
+                          {planets.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-0.5 mt-1">
+                              {planets.map(p => (
+                                <span key={p.name} className="text-[13px] leading-none" style={{ color: PLANET_COLORS[p.name] || ACCENT }} title={`${p.name} ${p.sign}${p.degree}°`}>
+                                  {PLANET_GLYPHS[p.name] || p.name[0]}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap justify-center gap-x-3 gap-y-1">
+                    {currentChart.planets.slice(0, 10).map(p => (
+                      <span key={p.name} className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                        <span style={{ color: PLANET_COLORS[p.name] || ACCENT }}>{PLANET_GLYPHS[p.name]}</span>{p.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

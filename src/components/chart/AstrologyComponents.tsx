@@ -84,7 +84,7 @@ function polarToXY(cx: number, cy: number, r: number, angleDeg: number): { x: nu
 /* SVG Natal Chart Wheel                  */
 /* ═══════════════════════════════════════ */
 
-export function NatalChartSVG({ chart }: { chart: AstrologyChart }) {
+export function NatalChartSVG({ chart, hideAskAI }: { chart: AstrologyChart; hideAskAI?: boolean }) {
   const { planets, houses, aspects, ascendant, midheaven } = chart;
   const SIZE = 380;
   const CX = SIZE / 2;
@@ -234,10 +234,12 @@ export function NatalChartSVG({ chart }: { chart: AstrologyChart }) {
         {moonPlanet && <span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)' }}>☽ {moonPlanet.sign}座</span>}
         <span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'var(--accent-secondary-dim)', color: 'var(--accent-secondary)' }}>↑ {SIGNS_CN[ascSignIndex]}座</span>
       </div>
-      <Link href="/chat" className="mx-auto flex max-w-sm items-center justify-between rounded-xl px-4 py-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
-        <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>什么时候适合做重大决定？</span>
-        <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>问AI →</span>
-      </Link>
+      {!hideAskAI && (
+        <Link href="/chat" className="mx-auto flex max-w-sm items-center justify-between rounded-xl px-4 py-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+          <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>什么时候适合做重大决定？</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>问AI →</span>
+        </Link>
+      )}
     </div>
   );
 }

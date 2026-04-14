@@ -673,7 +673,7 @@ function ChatContent() {
                             {/* SVG Chart */}
                             <div className="flex justify-center px-3 py-3" style={{ background: 'linear-gradient(180deg, rgba(123,108,184,0.03), transparent)' }}>
                               <div style={{ maxWidth: '240px', width: '100%' }}>
-                                <NatalChartSVG chart={natalChart} />
+                                <NatalChartSVG chart={natalChart} hideAskAI />
                               </div>
                             </div>
 

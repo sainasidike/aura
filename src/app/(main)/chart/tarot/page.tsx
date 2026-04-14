@@ -410,7 +410,7 @@ export default function TarotPage() {
             </div>
 
             {/* Preset questions */}
-            <div className="stagger-children mb-6 space-y-2.5">
+            <div className="stagger-children mb-6 space-y-2.5 max-h-[40vh] overflow-y-auto">
               {PRESET_QUESTIONS.map((pq, i) => (
                 <button
                   key={i}

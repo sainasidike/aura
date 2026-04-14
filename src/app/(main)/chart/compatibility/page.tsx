@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
-import ShareModal from '@/components/ui/ShareModal';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
@@ -60,7 +59,6 @@ function CompatibilityContent() {
   const [error, setError] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
-  const [shareOpen, setShareOpen] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -206,7 +204,7 @@ function CompatibilityContent() {
       await navigator.clipboard.writeText(report);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      setShareOpen(false);
+
     } catch {
       const ta = document.createElement('textarea');
       ta.value = report;
@@ -217,7 +215,7 @@ function CompatibilityContent() {
       document.body.removeChild(ta);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      setShareOpen(false);
+
     }
   }, [report]);
 
@@ -256,7 +254,7 @@ function CompatibilityContent() {
         a.click();
         URL.revokeObjectURL(url);
       }, 'image/png');
-      setShareOpen(false);
+
     } catch (e) {
       console.error('生成图片失败:', e);
     }
@@ -880,14 +878,15 @@ function CompatibilityContent() {
               {copied ? '已复制' : '复制全文'}
             </button>
             <button
-              onClick={() => setShareOpen(true)}
-              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              onClick={handleSaveImage}
+              disabled={shareLoading}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95 disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${LOVE_COLOR}, #b06080)`, color: '#fff', boxShadow: `0 4px 16px ${LOVE_COLOR}25` }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
               </svg>
-              保存为图片
+              {shareLoading ? '保存中...' : '保存为图片'}
             </button>
             <button
               onClick={() => handleCompare(true)}
@@ -1302,13 +1301,6 @@ function CompatibilityContent() {
         )}
       </div>
 
-      <ShareModal
-        open={shareOpen}
-        loading={shareLoading}
-        onClose={() => setShareOpen(false)}
-        onCopyText={handleCopyText}
-        onSaveImage={handleSaveImage}
-      />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { getProfiles, type StoredProfile } from '@/lib/storage';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
-import ShareModal from '@/components/ui/ShareModal';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#5090d0';
@@ -32,7 +31,6 @@ function DavisonContent() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-  const [shareOpen, setShareOpen] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -153,13 +151,11 @@ function DavisonContent() {
     if (!report) return;
     try {
       await navigator.clipboard.writeText(report);
-      setCopied(true); setTimeout(() => setCopied(false), 2000); setShareOpen(false);
-    } catch {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);    } catch {
       const ta = document.createElement('textarea');
       ta.value = report; ta.style.cssText = 'position:fixed;left:-9999px';
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-      setCopied(true); setTimeout(() => setCopied(false), 2000); setShareOpen(false);
-    }
+      setCopied(true); setTimeout(() => setCopied(false), 2000);    }
   }, [report]);
 
   const handleSaveImage = useCallback(async () => {
@@ -189,8 +185,7 @@ function DavisonContent() {
         a.href = url; a.download = `时空中点盘_${selectedA.name}_${selectedB.name}_${new Date().toISOString().slice(0, 10)}.png`;
         a.click(); URL.revokeObjectURL(url);
       }, 'image/png');
-      setShareOpen(false);
-    } catch (e) { console.error('生成图片失败:', e); }
+         } catch (e) { console.error('生成图片失败:', e); }
     setShareLoading(false);
   }, [report, selectedA, selectedB]);
 
@@ -452,13 +447,13 @@ function DavisonContent() {
               </svg>
               {copied ? '已复制' : '复制全文'}
             </button>
-            <button onClick={() => setShareOpen(true)}
+            <button onClick={handleSaveImage} disabled={shareLoading}
               className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
               style={{ background: `linear-gradient(135deg, ${ACCENT}, #4080c0)`, color: '#fff', boxShadow: `0 4px 16px ${ACCENT}25` }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
               </svg>
-              保存为图片
+              {shareLoading ? '保存中...' : '保存为图片'}
             </button>
             <button onClick={() => handleAnalyze(true)} className="flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
@@ -534,13 +529,6 @@ function DavisonContent() {
         )}
       </div>
 
-      <ShareModal
-        open={shareOpen}
-        loading={shareLoading}
-        onClose={() => setShareOpen(false)}
-        onCopyText={handleCopyText}
-        onSaveImage={handleSaveImage}
-      />
     </div>
   );
 }

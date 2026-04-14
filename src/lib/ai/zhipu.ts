@@ -12,19 +12,26 @@ export interface ZhipuMessage {
   content: string;
 }
 
-/**
- * 调用智谱 AI（流式返回）
- */
-export async function* streamChat(
-  messages: ZhipuMessage[],
-  apiKey: string,
-): AsyncGenerator<string> {
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2000;
+
+function parseZhipuError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const msg = parsed?.error?.message || parsed?.message;
+    if (msg) return msg;
+  } catch { /* not JSON */ }
+  if (status === 429) return '请求过于频繁，请稍后再试';
+  if (status === 401) return 'API 密钥无效，请检查配置';
+  return `AI 服务错误 (${status})`;
+}
+
+async function fetchZhipu(messages: ZhipuMessage[], apiKey: string): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
 
-  let response: Response;
   try {
-    response = await fetch(ZHIPU_API_URL, {
+    const response = await fetch(ZHIPU_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -39,6 +46,8 @@ export async function* streamChat(
       }),
       signal: controller.signal,
     });
+    clearTimeout(timeout);
+    return response;
   } catch (err: unknown) {
     clearTimeout(timeout);
     if (err instanceof Error && err.name === 'AbortError') {
@@ -46,11 +55,31 @@ export async function* streamChat(
     }
     throw new Error(`AI 服务连接失败: ${err instanceof Error ? err.message : String(err)}`);
   }
-  clearTimeout(timeout);
+}
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Zhipu API error ${response.status}: ${error}`);
+/**
+ * 调用智谱 AI（流式返回，429 自动重试）
+ */
+export async function* streamChat(
+  messages: ZhipuMessage[],
+  apiKey: string,
+): AsyncGenerator<string> {
+  let response: Response | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    response = await fetchZhipu(messages, apiKey);
+
+    if (response.status === 429 && attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+      continue;
+    }
+    break;
+  }
+
+  if (!response || !response.ok) {
+    const body = response ? await response.text() : '';
+    const status = response?.status || 0;
+    throw new Error(parseZhipuError(status, body));
   }
 
   const reader = response.body?.getReader();

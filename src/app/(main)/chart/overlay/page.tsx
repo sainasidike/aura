@@ -30,11 +30,32 @@ function OverlayContent() {
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const cacheKey = (selectedA && selectedB) ? `overlay_${selectedA.id}_${selectedB.id}` : '';
+
   useEffect(() => {
     const ps = getProfiles();
     setProfiles(ps);
     if (ps.length > 0) setSelectedA(ps[0]);
   }, []);
+
+  // Load cache
+  useEffect(() => {
+    if (!cacheKey) return;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const d = JSON.parse(cached);
+        if (d.report) setReport(d.report);
+        if (d.chartData) setChartData(d.chartData);
+      }
+    } catch { /* */ }
+  }, [cacheKey]);
+
+  // Save cache
+  useEffect(() => {
+    if (!cacheKey || !report || loading) return;
+    try { localStorage.setItem(cacheKey, JSON.stringify({ report, chartData, ts: Date.now() })); } catch { /* */ }
+  }, [cacheKey, report, chartData, loading]);
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = contentRef.current.scrollHeight;
@@ -69,8 +90,9 @@ function OverlayContent() {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (force = false) => {
     if (!selectedA || !selectedB) return;
+    if (force && cacheKey) { try { localStorage.removeItem(cacheKey); } catch { /* */ } }
     setLoading(true);
     setError('');
     setReport('');
@@ -193,9 +215,9 @@ function OverlayContent() {
           </p>
         </div>
 
-        {selectedA && selectedB && !report && !loading && !error && (
+        {selectedA && selectedB && !report && !loading && !error && !chartData && (
           <div className="flex justify-center py-4">
-            <button onClick={handleAnalyze} className="rounded-full px-8 py-3 text-sm font-semibold transition active:scale-95"
+            <button onClick={() => handleAnalyze()} className="rounded-full px-8 py-3 text-sm font-semibold transition active:scale-95"
               style={{ background: `linear-gradient(135deg, ${ACCENT}, #a07040)`, color: '#fff', boxShadow: `0 4px 20px ${ACCENT}40` }}>
               开始马盘分析
             </button>
@@ -214,7 +236,7 @@ function OverlayContent() {
         {error && (
           <div className="flex flex-col items-center gap-4 py-16">
             <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>
-            <button onClick={handleAnalyze} className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: `linear-gradient(135deg, ${ACCENT}, #a07040)` }}>重试</button>
+            <button onClick={() => handleAnalyze()} className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: `linear-gradient(135deg, ${ACCENT}, #a07040)` }}>重试</button>
           </div>
         )}
 
@@ -227,6 +249,15 @@ function OverlayContent() {
         {loading && report && (
           <div className="mt-3 flex justify-center">
             <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: ACCENT }} />
+          </div>
+        )}
+
+        {report && !loading && (
+          <div className="mt-4 flex justify-center animate-fadeIn">
+            <button onClick={() => handleAnalyze(true)} className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+              重新生成
+            </button>
           </div>
         )}
 

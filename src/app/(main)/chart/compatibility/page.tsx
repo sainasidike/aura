@@ -77,11 +77,57 @@ function CompatibilityContent() {
   const [activeReportType, setActiveReportType] = useState<'synastry' | 'composite' | 'davison'>('synastry');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Cache helpers
+  const cacheKeyBase = (selectedA && selectedB) ? `compat_${selectedA.id}_${selectedB.id}` : '';
+
   useEffect(() => {
     const ps = getProfiles();
     setProfiles(ps);
     if (ps.length > 0) setSelectedA(ps[0]);
   }, []);
+
+  // Load cache when A+B are selected
+  useEffect(() => {
+    if (!cacheKeyBase) return;
+    try {
+      const synCache = localStorage.getItem(`${cacheKeyBase}_syn`);
+      if (synCache) {
+        const d = JSON.parse(synCache);
+        if (d.result) setResult(d.result);
+        if (d.report) setReport(d.report);
+      }
+      const compCache = localStorage.getItem(`${cacheKeyBase}_comp`);
+      if (compCache) {
+        const d = JSON.parse(compCache);
+        if (d.report) setCompositeReport(d.report);
+        if (d.chartData) setCompositeData(d.chartData);
+      }
+      const davCache = localStorage.getItem(`${cacheKeyBase}_dav`);
+      if (davCache) {
+        const d = JSON.parse(davCache);
+        if (d.report) setDavisonReport(d.report);
+        if (d.chartData) setDavisonData(d.chartData);
+      }
+    } catch { /* ignore */ }
+  }, [cacheKeyBase]);
+
+  // Save synastry cache
+  useEffect(() => {
+    if (!cacheKeyBase || !report || reportLoading) return;
+    try { localStorage.setItem(`${cacheKeyBase}_syn`, JSON.stringify({ result, report, ts: Date.now() })); } catch { /* */ }
+  }, [cacheKeyBase, result, report, reportLoading]);
+
+  // Save composite cache
+  useEffect(() => {
+    if (!cacheKeyBase || !compositeReport || compositeLoading) return;
+    try { localStorage.setItem(`${cacheKeyBase}_comp`, JSON.stringify({ report: compositeReport, chartData: compositeData, ts: Date.now() })); } catch { /* */ }
+  }, [cacheKeyBase, compositeReport, compositeData, compositeLoading]);
+
+  // Save davison cache
+  useEffect(() => {
+    if (!cacheKeyBase || !davisonReport || davisonLoading) return;
+    try { localStorage.setItem(`${cacheKeyBase}_dav`, JSON.stringify({ report: davisonReport, chartData: davisonData, ts: Date.now() })); } catch { /* */ }
+  }, [cacheKeyBase, davisonReport, davisonData, davisonLoading]);
 
   const handleCopyText = useCallback(async () => {
     if (!report) return;
@@ -208,16 +254,26 @@ function CompatibilityContent() {
     }
   };
 
-  const handleCompare = async () => {
+  const handleCompare = async (forceRegenerate = false) => {
     if (!selectedA || !selectedB) return;
     setLoading(true);
     setError('');
     setResult(null);
     setReport('');
-    setCompositeReport('');
-    setCompositeData(null);
-    setDavisonReport('');
-    setDavisonData(null);
+    if (forceRegenerate) {
+      setCompositeReport('');
+      setCompositeData(null);
+      setDavisonReport('');
+      setDavisonData(null);
+      // Clear all caches for this pair
+      if (cacheKeyBase) {
+        try {
+          localStorage.removeItem(`${cacheKeyBase}_syn`);
+          localStorage.removeItem(`${cacheKeyBase}_comp`);
+          localStorage.removeItem(`${cacheKeyBase}_dav`);
+        } catch { /* */ }
+      }
+    }
     setChatMessages([]);
     setSuggestedQuestions([]);
 
@@ -275,9 +331,12 @@ function CompatibilityContent() {
     setReportLoading(false);
   };
 
-  // Load composite chart + report
-  const handleLoadComposite = async () => {
+  // Load composite chart + report (force = regenerate)
+  const handleLoadComposite = async (force = false) => {
     if (!selectedA || !selectedB || compositeLoading) return;
+    if (force && cacheKeyBase) {
+      try { localStorage.removeItem(`${cacheKeyBase}_comp`); } catch { /* */ }
+    }
     setCompositeLoading(true);
     setCompositeReport('');
     setChatMessages([]);
@@ -339,9 +398,12 @@ function CompatibilityContent() {
     setCompositeLoading(false);
   };
 
-  // Load Davison chart + report
-  const handleLoadDavison = async () => {
+  // Load Davison chart + report (force = regenerate)
+  const handleLoadDavison = async (force = false) => {
     if (!selectedA || !selectedB || davisonLoading) return;
+    if (force && cacheKeyBase) {
+      try { localStorage.removeItem(`${cacheKeyBase}_dav`); } catch { /* */ }
+    }
     setDavisonLoading(true);
     setDavisonReport('');
     setChatMessages([]);
@@ -585,7 +647,7 @@ function CompatibilityContent() {
             {selectedA && selectedB && !result && !loading && !error && (
               <div className="flex justify-center py-4">
                 <button
-                  onClick={handleCompare}
+                  onClick={() => handleCompare()}
                   className="rounded-full px-8 py-3 text-sm font-semibold transition active:scale-95"
                   style={{ background: `linear-gradient(135deg, ${LOVE_COLOR}, #b06080)`, color: '#fff', boxShadow: `0 4px 20px ${LOVE_COLOR}40` }}
                 >
@@ -641,7 +703,7 @@ function CompatibilityContent() {
         {error && (
           <div className="flex flex-col items-center gap-4 py-16">
             <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>
-            <button onClick={handleCompare} className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: `linear-gradient(135deg, ${LOVE_COLOR}, #b06080)` }}>
+            <button onClick={() => handleCompare()} className="rounded-full px-6 py-2.5 text-sm font-medium text-white" style={{ background: `linear-gradient(135deg, ${LOVE_COLOR}, #b06080)` }}>
               重试
             </button>
           </div>
@@ -724,7 +786,7 @@ function CompatibilityContent() {
 
         {/* Share buttons */}
         {report && !reportLoading && (
-          <div className="mt-4 flex items-center justify-center gap-3 animate-fadeIn">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 animate-fadeIn">
             <button
               onClick={handleCopyText}
               className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
@@ -745,6 +807,16 @@ function CompatibilityContent() {
               </svg>
               保存为图片
             </button>
+            <button
+              onClick={() => handleCompare(true)}
+              className="flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              重新生成
+            </button>
           </div>
         )}
 
@@ -759,12 +831,9 @@ function CompatibilityContent() {
             <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
               <button
                 onClick={() => {
-                  if (!compositeReport && !compositeLoading) {
-                    handleLoadComposite();
-                  }
+                  if (!compositeReport && !compositeLoading) handleLoadComposite();
                   setActiveReportType('composite');
-                  setChatMessages([]);
-                  setSuggestedQuestions([]);
+                  setChatMessages([]); setSuggestedQuestions([]);
                 }}
                 disabled={compositeLoading}
                 className="flex w-full items-center gap-3 px-5 py-4 text-left transition active:scale-[0.99]"
@@ -809,6 +878,14 @@ function CompatibilityContent() {
                   {compositeLoading && compositeReport && (
                     <div className="flex justify-center pb-4">
                       <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: '#9070b0' }} />
+                    </div>
+                  )}
+                  {compositeReport && !compositeLoading && (
+                    <div className="flex justify-center pb-4">
+                      <button onClick={() => handleLoadComposite(true)} className="flex items-center gap-1.5 text-xs transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+                        重新生成
+                      </button>
                     </div>
                   )}
                 </div>
@@ -869,6 +946,14 @@ function CompatibilityContent() {
                   {davisonLoading && davisonReport && (
                     <div className="flex justify-center pb-4">
                       <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: '#5090d0' }} />
+                    </div>
+                  )}
+                  {davisonReport && !davisonLoading && (
+                    <div className="flex justify-center pb-4">
+                      <button onClick={() => handleLoadDavison(true)} className="flex items-center gap-1.5 text-xs transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+                        重新生成
+                      </button>
                     </div>
                   )}
                 </div>

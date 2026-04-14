@@ -336,9 +336,10 @@ export default function FortunePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: '今日运势指引：请结合这张塔罗牌为我解读今天的整体运势、需要注意的事项和建议',
+          question: '今日运势指引',
           cards: cardPayload,
           spread: { name: spread.name, description: spread.description },
+          mode: 'daily_fortune',
         }),
         signal: controller.signal,
       });
@@ -823,12 +824,20 @@ export default function FortunePage() {
                             transition={{ delay: 0.5, duration: 0.4 }}
                           >
                             {tarotText ? (
-                              <p
-                                className="text-[0.8rem] leading-7 whitespace-pre-wrap"
+                              <div
+                                className="text-[0.8rem] leading-7 space-y-3"
                                 style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}
                               >
-                                {tarotText}
-                              </p>
+                                {tarotText
+                                  .replace(/#{1,6}\s*/g, '')
+                                  .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
+                                  .replace(/^[-•]\s*/gm, '')
+                                  .replace(/^\d+\.\s*/gm, '')
+                                  .split(/\n\s*\n/)
+                                  .map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' '))
+                                  .filter(Boolean)
+                                  .map((para, i) => <p key={i}>{para}</p>)}
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 animate-shimmer">
                                 <span className="text-xs" style={{ color: "#c084fc" }}>

@@ -55,3 +55,17 @@ export function deleteProfile(id: string): void {
 export function getProfileById(id: string): StoredProfile | undefined {
   return getProfiles().find(p => p.id === id);
 }
+
+const ACTIVE_PROFILE_KEY = 'aura_active_profile';
+
+/** 获取当前活跃档案 ID（跨页面同步） */
+export function getActiveProfileId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(ACTIVE_PROFILE_KEY); } catch { return null; }
+}
+
+/** 设置当前活跃档案 ID（跨页面同步） */
+export function setActiveProfileId(id: string): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(ACTIVE_PROFILE_KEY, id); } catch { /* ignore */ }
+}

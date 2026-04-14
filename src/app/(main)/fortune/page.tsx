@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { getProfiles, type StoredProfile } from "@/lib/storage";
+import { getProfiles, getActiveProfileId, setActiveProfileId, type StoredProfile } from "@/lib/storage";
 import { getGlossaryEntry } from "@/lib/astrology-glossary";
 import { ALL_CARDS, type TarotCard, getCardImageUrl } from "@/lib/tarot-data";
 import { SPREADS } from "@/lib/tarot-spreads";
@@ -175,13 +175,18 @@ export default function FortunePage() {
   useEffect(() => {
     const ps = getProfiles();
     setPersons(ps);
-    if (ps.length > 0) setActiveId(ps[0].id);
+    if (ps.length > 0) {
+      const savedId = getActiveProfileId();
+      const found = savedId && ps.find(p => p.id === savedId);
+      setActiveId(found ? savedId : ps[0].id);
+    }
   }, []);
 
   const activePerson = persons.find(p => p.id === activeId) ?? null;
 
-  // 切换档案时重置所有状态
+  // 切换档案时重置所有状态 + 持久化选择
   useEffect(() => {
+    if (activeId) setActiveProfileId(activeId);
     setFortune(null);
     setInterpretations({});
     setInterpretDone(false);

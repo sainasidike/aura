@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { getProfileById, getProfiles, getActiveProfileId, setActiveProfileId, type StoredProfile } from '@/lib/storage';
 import { fetchNatalCharts } from '@/lib/chart-cache';
 import { generateChatImage, downloadBlob } from '@/lib/chat-image';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
@@ -134,12 +134,18 @@ function ChatContent() {
     let p: StoredProfile | undefined;
     if (paramProfileId) p = getProfileById(paramProfileId);
     if (!p) {
+      // 优先使用全局活跃档案（跨页面同步）
+      const savedId = getActiveProfileId();
+      if (savedId) p = getProfileById(savedId);
+    }
+    if (!p) {
       const all = getProfiles();
       if (all.length > 0) p = all[0];
     }
     if (p) {
       setProfile(p);
       profileIdRef.current = p.id;
+      setActiveProfileId(p.id);
       fetchAllChartData(p);
     }
   }, [paramProfileId]);

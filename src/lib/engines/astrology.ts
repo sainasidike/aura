@@ -591,3 +591,91 @@ const PLANET_SHORT_EN: Record<string, string> = {
   '太阳': '日', '月亮': '月', '水星': '水', '金星': '金', '火星': '火',
   '木星': '木', '土星': '土', '天王星': '天', '海王星': '海', '冥王星': '冥', '北交点': '☊',
 };
+
+/* ═══════════════════════════════════════ */
+/* 组合盘 (Composite Chart)                */
+/* ═══════════════════════════════════════ */
+
+/** 短弧中点：正确处理跨 0° 的情况 */
+function shortArcMidpoint(lon1: number, lon2: number): number {
+  const diff = ((lon2 - lon1 + 540) % 360) - 180;
+  return ((lon1 + diff / 2) % 360 + 360) % 360;
+}
+
+/**
+ * 计算组合盘 (Composite Chart)
+ * 两人行星黄经取短弧中点，宫头取中点 (Robert Hand 中点宫位法)
+ */
+export function calculateComposite(
+  chartA: AstrologyChart,
+  chartB: AstrologyChart,
+): AstrologyChart {
+  // 行星中点
+  const planets: PlanetPosition[] = [];
+  for (let i = 0; i < Math.min(chartA.planets.length, chartB.planets.length); i++) {
+    const a = chartA.planets[i];
+    const b = chartB.planets[i];
+    const midLon = shortArcMidpoint(a.longitude, b.longitude);
+    const midLat = (a.latitude + b.latitude) / 2;
+    const info = lonToSign(midLon);
+    planets.push({
+      name: a.name,
+      longitude: midLon,
+      latitude: midLat,
+      sign: info.sign,
+      degree: info.degree,
+      minute: info.minute,
+      house: 1, // 重新分配
+      retrograde: false, // 组合盘无逆行
+    });
+  }
+
+  // ASC / MC 中点
+  const ascendant = shortArcMidpoint(chartA.ascendant, chartB.ascendant);
+  const midheaven = shortArcMidpoint(chartA.midheaven, chartB.midheaven);
+
+  // 宫头中点 (Robert Hand 中点宫位法)
+  const houses: HousePosition[] = [];
+  for (let i = 0; i < Math.min(chartA.houses.length, chartB.houses.length); i++) {
+    const ha = chartA.houses[i];
+    const hb = chartB.houses[i];
+    const midLon = shortArcMidpoint(ha.longitude, hb.longitude);
+    const info = lonToSign(midLon);
+    houses.push({
+      number: ha.number,
+      sign: info.sign,
+      degree: info.degree,
+      minute: info.minute,
+      longitude: midLon,
+    });
+  }
+
+  // 重新分配行星宫位
+  for (const p of planets) {
+    p.house = getHouseNumber(p.longitude, houses);
+  }
+
+  // 盘内相位
+  const aspects = calculateAspects(planets);
+
+  return { planets, houses, aspects, ascendant, midheaven };
+}
+
+/* ═══════════════════════════════════════ */
+/* 时空中点盘 (Davison Chart)              */
+/* ═══════════════════════════════════════ */
+
+/**
+ * 计算 Davison 盘 (时空中点盘)
+ * 取两人出生时间戳中点 + 经纬度中点，算一张真实星盘
+ */
+export function calculateDavison(
+  birthA: { date: Date; lat: number; lon: number },
+  birthB: { date: Date; lat: number; lon: number },
+): { chart: AstrologyChart; midpointDate: Date } {
+  const midTime = new Date((birthA.date.getTime() + birthB.date.getTime()) / 2);
+  const midLat = (birthA.lat + birthB.lat) / 2;
+  const midLon = (birthA.lon + birthB.lon) / 2;
+  const chart = calculateChartFromDate(midTime, midLat, midLon);
+  return { chart, midpointDate: midTime };
+}

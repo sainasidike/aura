@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
+import ShareModal from '@/components/ui/ShareModal';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#9070b0';
@@ -31,6 +32,9 @@ function CompositeContent() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -132,6 +136,69 @@ function CompositeContent() {
       }
     }
   };
+
+  const handleCopyText = useCallback(async () => {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setShareOpen(false);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = report;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setShareOpen(false);
+    }
+  }, [report]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (!report || !selectedA || !selectedB) return;
+    setShareLoading(true);
+    try {
+      const html2canvas = (await import('html2canvas-pro')).default;
+      const container = document.createElement('div');
+      container.style.cssText = `position:fixed;left:-9999px;top:0;width:390px;background:#f8f7fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#2d2b3d;font-size:13px;line-height:1.6;`;
+      container.innerHTML = `
+        <div style="background:linear-gradient(135deg,${ACCENT},${ACCENT}cc);padding:28px 20px 22px;color:#fff">
+          <div style="font-size:28px;margin-bottom:6px">&#9678;</div>
+          <div style="font-size:20px;font-weight:700">组合盘分析</div>
+          <div style="font-size:12px;margin-top:6px;opacity:0.85">${selectedA.name} & ${selectedB.name}</div>
+        </div>
+      `;
+      const body = document.createElement('div');
+      body.style.cssText = 'padding:20px;font-size:13px;line-height:1.8;color:#2d2b3d';
+      body.innerHTML = simpleMarkdown(report);
+      container.appendChild(body);
+      const footer = document.createElement('div');
+      footer.style.cssText = 'text-align:center;padding:16px 0 24px;font-size:11px;color:#bbb';
+      footer.textContent = 'Aura AI - 仅供参考与娱乐';
+      container.appendChild(footer);
+      document.body.appendChild(container);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#f8f7fc', useCORS: true, logging: false });
+      document.body.removeChild(container);
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `组合盘_${selectedA.name}_${selectedB.name}_${new Date().toISOString().slice(0, 10)}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+      setShareOpen(false);
+    } catch (e) {
+      console.error('生成图片失败:', e);
+    }
+    setShareLoading(false);
+  }, [report, selectedA, selectedB]);
 
   const handleAnalyze = async (force = false) => {
     if (!selectedA || !selectedB) return;
@@ -382,8 +449,24 @@ function CompositeContent() {
         })()}
 
         {report && !loading && (
-          <div className="mt-4 flex justify-center animate-fadeIn">
-            <button onClick={() => handleAnalyze(true)} className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 animate-fadeIn">
+            <button onClick={handleCopyText}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+              {copied ? '已复制' : '复制全文'}
+            </button>
+            <button onClick={() => setShareOpen(true)}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              style={{ background: `linear-gradient(135deg, ${ACCENT}, #7060a0)`, color: '#fff', boxShadow: `0 4px 16px ${ACCENT}25` }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+              </svg>
+              保存为图片
+            </button>
+            <button onClick={() => handleAnalyze(true)} className="flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition active:scale-95" style={{ color: 'var(--text-tertiary)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
               重新生成
             </button>
@@ -456,6 +539,14 @@ function CompositeContent() {
           </div>
         )}
       </div>
+
+      <ShareModal
+        open={shareOpen}
+        loading={shareLoading}
+        onClose={() => setShareOpen(false)}
+        onCopyText={handleCopyText}
+        onSaveImage={handleSaveImage}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { fetchNatalCharts } from '@/lib/chart-cache';
 import { generateChatImage, downloadBlob } from '@/lib/chat-image';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ShareModal from '@/components/ui/ShareModal';
@@ -146,43 +147,41 @@ function ChatContent() {
 
   const fetchAllChartData = async (p: StoredProfile) => {
     try {
+      // 本命盘（bazi/ziwei）走缓存；行运/回归盘实时计算
       const body = {
         year: p.year, month: p.month, day: p.day,
         hour: p.hour, minute: p.minute, gender: p.gender,
         longitude: p.longitude, latitude: p.latitude, timezone: p.timezone,
       };
       const opts = { method: 'POST' as const, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-      const results = await Promise.allSettled([
-        fetch('/api/bazi', opts),
-        fetch('/api/ziwei', opts),
-        fetch('/api/astrology/transit', opts),
-        fetch('/api/astrology/solar-return', opts),
-        fetch('/api/astrology/lunar-return', opts),
+
+      const [natalCharts, transitRes, solarRes, lunarRes] = await Promise.all([
+        fetchNatalCharts(p, ['bazi', 'ziwei']),
+        fetch('/api/astrology/transit', opts).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/astrology/solar-return', opts).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/astrology/lunar-return', opts).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
 
-      const parse = async (r: PromiseSettledResult<Response>) => {
-        if (r.status === 'fulfilled' && r.value.ok) return r.value.json();
-        return null;
-      };
-      const [bazi, ziwei, transit, solarReturn, lunarReturn] = await Promise.all(results.map(parse));
+      const bazi = natalCharts.bazi as Record<string, unknown> | null;
+      const ziwei = natalCharts.ziwei as Record<string, unknown> | null;
 
       const data: Record<string, unknown> = {
         profile: { name: p.name, gender: p.gender, birthDate: `${p.year}-${p.month}-${p.day}`, birthTime: `${p.hour}:${p.minute}`, city: p.city },
-        timeInfo: bazi?.timeInfo,
+        timeInfo: (bazi as Record<string, unknown>)?.timeInfo,
       };
-      if (bazi?.chart) data.bazi = bazi.chart;
-      if (ziwei?.chart) data.ziwei = ziwei.chart;
-      if (transit) {
-        data.natalChart = transit.natalChart;
-        data.transitChart = transit.transitChart;
-        data.crossAspects = transit.crossAspects;
-        data.transitTime = transit.transitTime;
+      if ((bazi as Record<string, unknown>)?.chart) data.bazi = (bazi as Record<string, unknown>).chart;
+      if ((ziwei as Record<string, unknown>)?.chart) data.ziwei = (ziwei as Record<string, unknown>).chart;
+      if (transitRes) {
+        data.natalChart = transitRes.natalChart;
+        data.transitChart = transitRes.transitChart;
+        data.crossAspects = transitRes.crossAspects;
+        data.transitTime = transitRes.transitTime;
       }
-      if (solarReturn) {
-        data.solarReturn = { year: solarReturn.year, returnMoment: solarReturn.returnMoment, chart: solarReturn.chart };
+      if (solarRes) {
+        data.solarReturn = { year: solarRes.year, returnMoment: solarRes.returnMoment, chart: solarRes.chart };
       }
-      if (lunarReturn) {
-        data.lunarReturn = { returnMoment: lunarReturn.returnMoment, nextReturn: lunarReturn.nextReturn, chart: lunarReturn.chart };
+      if (lunarRes) {
+        data.lunarReturn = { returnMoment: lunarRes.returnMoment, nextReturn: lunarRes.nextReturn, chart: lunarRes.chart };
       }
       setAllChartData(data);
     } catch { /* chart fetch failed, can still chat */ }

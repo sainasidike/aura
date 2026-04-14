@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { fetchNatalChart } from '@/lib/chart-cache';
 import { BaziDisplay } from '@/components/chart/BaziDisplay';
 import type { BaziChart, TimeStandardization } from '@/types';
 
@@ -36,17 +37,8 @@ function BaziContent() {
     if (!profile) return;
     setLoading(true);
     setError('');
-    fetch('/api/bazi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: profile.year, month: profile.month, day: profile.day,
-        hour: profile.hour, minute: profile.minute, gender: profile.gender,
-        longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
-      }),
-    })
-      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
-      .then(({ ok, data }) => { if (!ok) throw new Error(data.error); setData(data); })
+    fetchNatalChart<{ timeInfo: TimeStandardization; chart: BaziChart }>(profile, 'bazi')
+      .then(d => setData(d))
       .catch(e => setError(e instanceof Error ? e.message : '计算失败'))
       .finally(() => setLoading(false));
   }, [profile]);

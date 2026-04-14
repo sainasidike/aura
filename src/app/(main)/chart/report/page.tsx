@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { fetchNatalCharts } from '@/lib/chart-cache';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ShareModal from '@/components/ui/ShareModal';
@@ -202,32 +203,12 @@ function ReportContent() {
     if (cacheKey) try { localStorage.removeItem(cacheKey); } catch { /* */ }
 
     try {
-      const [astroRes, baziRes] = await Promise.all([
-        fetch('/api/astrology', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: profile.year, month: profile.month, day: profile.day,
-            hour: profile.hour, minute: profile.minute, gender: profile.gender,
-            longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
-          }),
-        }),
-        fetch('/api/bazi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: profile.year, month: profile.month, day: profile.day,
-            hour: profile.hour, minute: profile.minute, gender: profile.gender,
-            longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
-          }),
-        }),
-      ]);
+      const charts = await fetchNatalCharts(profile, ['astrology', 'bazi']);
+      const astroData = charts.astrology;
+      const baziData = charts.bazi;
 
-      const astroData = await astroRes.json();
-      const baziData = await baziRes.json();
-
-      if (!astroRes.ok) throw new Error(astroData.error);
-      if (!baziRes.ok) throw new Error(baziData.error);
+      if (!astroData) throw new Error('星盘计算失败');
+      if (!baziData) throw new Error('八字计算失败');
 
       setChartLoading(false);
       setLoading(true);

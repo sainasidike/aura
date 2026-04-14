@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
+import { fetchNatalChart } from '@/lib/chart-cache';
 import { NatalChartSVG, ParamsDisplay, AspectGrid, TransitOverlaySVG, ReturnDetailPanel, TransitAspectsList } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
@@ -212,24 +213,32 @@ function AstrologyContent() {
     if (all.length > 0) setProfile(all[0]);
   }, [paramProfileId]);
 
-  // Fetch natal chart
+  // Fetch natal chart (use cache when hour/minute match profile)
   const fetchNatal = useCallback(() => {
     if (!profile) return;
     setLoading(true);
     setError('');
-    fetch('/api/astrology', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        year: profile.year, month: profile.month, day: profile.day,
-        hour: natalHour, minute: natalMinute, gender: profile.gender,
-        longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
-      }),
-    })
-      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
-      .then(({ ok, data }) => { if (!ok) throw new Error(data.error); setNatalData(data); })
-      .catch(e => setError(e instanceof Error ? e.message : '计算失败'))
-      .finally(() => setLoading(false));
+    const useCache = natalHour === profile.hour && natalMinute === (profile.minute ?? 0);
+    if (useCache) {
+      fetchNatalChart(profile, 'astrology')
+        .then(d => setNatalData(d as { timeInfo: unknown; chart: AstrologyChart }))
+        .catch(e => setError(e instanceof Error ? e.message : '计算失败'))
+        .finally(() => setLoading(false));
+    } else {
+      fetch('/api/astrology', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year: profile.year, month: profile.month, day: profile.day,
+          hour: natalHour, minute: natalMinute, gender: profile.gender,
+          longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
+        }),
+      })
+        .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+        .then(({ ok, data }) => { if (!ok) throw new Error(data.error); setNatalData(data); })
+        .catch(e => setError(e instanceof Error ? e.message : '计算失败'))
+        .finally(() => setLoading(false));
+    }
   }, [profile, natalHour, natalMinute]);
 
   // Auto-fetch natal on profile load

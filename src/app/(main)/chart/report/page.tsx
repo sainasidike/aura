@@ -7,7 +7,6 @@ import { getProfileById, getProfiles, getActiveProfileId, type StoredProfile } f
 import { fetchNatalCharts } from '@/lib/chart-cache';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
-import ShareModal from '@/components/ui/ShareModal';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 
 const REPORT_META: Record<string, { title: string; icon: string; color: string }> = {
@@ -163,7 +162,6 @@ function ReportContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [chartLoading, setChartLoading] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   // 追问对话
@@ -240,7 +238,6 @@ function ReportContent() {
       await navigator.clipboard.writeText(report);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      setShareOpen(false);
     } catch {
       // fallback
       const ta = document.createElement('textarea');
@@ -252,7 +249,6 @@ function ReportContent() {
       document.body.removeChild(ta);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      setShareOpen(false);
     }
   }, [report]);
 
@@ -312,7 +308,6 @@ function ReportContent() {
         URL.revokeObjectURL(url);
       }, 'image/png');
 
-      setShareOpen(false);
     } catch (e) {
       console.error('生成图片失败:', e);
     }
@@ -783,14 +778,15 @@ function ReportContent() {
               {copied ? '已复制' : '复制全文'}
             </button>
             <button
-              onClick={() => setShareOpen(true)}
-              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95"
+              onClick={handleSaveImage}
+              disabled={shareLoading}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-95 disabled:opacity-50"
               style={{ background: 'var(--gradient-primary)', color: 'var(--text-inverse)', boxShadow: '0 4px 16px rgba(123,108,184,0.25)' }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
               </svg>
-              保存为图片
+              {shareLoading ? '保存中...' : '保存为图片'}
             </button>
             <button
               onClick={generateReport}
@@ -898,14 +894,6 @@ function ReportContent() {
           </div>
         )}
       </div>
-
-      <ShareModal
-        open={shareOpen}
-        loading={shareLoading}
-        onClose={() => setShareOpen(false)}
-        onCopyText={handleCopyText}
-        onSaveImage={handleSaveImage}
-      />
 
       <GlossaryPopup
         entry={glossaryEntry}

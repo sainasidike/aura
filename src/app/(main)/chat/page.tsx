@@ -762,55 +762,13 @@ function ChatContent() {
                                 </span>
                               )}
                             </div>
-                            {/* Card body with structured sub-sections */}
-                            <div className="px-4 py-3 space-y-2.5">
-                              {sec.parts.length > 0 ? sec.parts.map((part, pi) => {
-                                if (part.type === 'text') {
-                                  return (
-                                    <div
-                                      key={pi}
-                                      className="prose-chat text-[13px] leading-[1.8]"
-                                      style={{ color: 'var(--text-secondary)' }}
-                                      dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
-                                    />
-                                  );
-                                }
-                                const partStyle = {
-                                  data:    { bg: 'rgba(123,108,184,0.06)', border: 'rgba(123,108,184,0.12)', iconBg: '#7b6cb8' },
-                                  insight: { bg: 'rgba(94,216,207,0.06)',  border: 'rgba(94,216,207,0.12)',  iconBg: '#3abfb6' },
-                                  advice:  { bg: 'rgba(184,150,62,0.06)', border: 'rgba(184,150,62,0.12)',  iconBg: '#b8963e' },
-                                }[part.type] || { bg: 'transparent', border: 'transparent', iconBg: '#999' };
-                                return (
-                                  <div
-                                    key={pi}
-                                    className="rounded-xl px-3 py-2.5"
-                                    style={{ background: partStyle.bg, border: `1px solid ${partStyle.border}` }}
-                                  >
-                                    <div className="mb-1 flex items-center gap-1.5">
-                                      <span
-                                        className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px]"
-                                        style={{ background: partStyle.iconBg, color: '#fff' }}
-                                      >
-                                        {part.emoji}
-                                      </span>
-                                      <span className="text-[11px] font-medium" style={{ color: partStyle.iconBg, opacity: 0.8 }}>
-                                        {part.label}
-                                      </span>
-                                    </div>
-                                    <div
-                                      className="prose-chat text-[13px] leading-[1.75]"
-                                      style={{ color: 'var(--text-primary)' }}
-                                      dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
-                                    />
-                                  </div>
-                                );
-                              }) : (
-                                <div
-                                  className="prose-chat text-[13px] leading-[1.8]"
-                                  style={{ color: 'var(--text-primary)' }}
-                                  dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
-                                />
-                              )}
+                            {/* Card body */}
+                            <div className="px-4 py-3">
+                              <div
+                                className="prose-chat text-[13px] leading-[1.8]"
+                                style={{ color: 'var(--text-primary)' }}
+                                dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
+                              />
                             </div>
                           </div>
                         );

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getProfiles, type StoredProfile } from "@/lib/storage";
 import { getGlossaryEntry } from "@/lib/astrology-glossary";
-import { ALL_CARDS, type TarotCard } from "@/lib/tarot-data";
+import { ALL_CARDS, type TarotCard, getCardImageUrl } from "@/lib/tarot-data";
 import { SPREADS } from "@/lib/tarot-spreads";
 import PersonSelector from "@/components/ui/PersonSelector";
 import Link from "next/link";
@@ -697,14 +697,16 @@ export default function FortunePage() {
                     {!tarotCard && (
                       <div className="flex flex-col items-center gap-4 py-4">
                         <div
-                          className="flex h-32 w-20 items-center justify-center rounded-xl text-2xl"
+                          className="flex flex-col items-center justify-center gap-2 rounded-xl"
                           style={{
+                            width: 120, height: 200,
                             background: "linear-gradient(135deg, #2d1b69, #4a2d8a)",
                             border: "2px solid rgba(192,132,252,0.3)",
                             boxShadow: "0 4px 20px rgba(45,27,105,0.3)",
                           }}
                         >
-                          <span style={{ opacity: 0.6 }}>✦</span>
+                          <span style={{ opacity: 0.5, fontSize: 32 }}>✦</span>
+                          <span style={{ opacity: 0.3, fontSize: 10, color: "#c084fc", letterSpacing: 2 }}>TAROT</span>
                         </div>
                         <motion.button
                           onClick={drawTarot}
@@ -725,44 +727,48 @@ export default function FortunePage() {
                     {tarotCard && (
                       <div className="flex flex-col items-center gap-4">
                         {/* 牌面 */}
-                        <div style={{ perspective: 600 }} className="my-2">
+                        <div style={{ perspective: 800 }} className="my-2">
                           <motion.div
                             style={{
-                              width: 80, height: 128, position: "relative",
+                              width: 120, height: 200, position: "relative",
                               transformStyle: "preserve-3d",
                             }}
                             initial={{ rotateY: 180 }}
                             animate={{ rotateY: tarotFlipped ? 0 : 180 }}
-                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                           >
-                            {/* 正面（牌面） */}
+                            {/* 正面（真实牌面图） */}
                             <div
-                              className="absolute inset-0 flex flex-col items-center justify-center rounded-xl"
+                              className="absolute inset-0 overflow-hidden rounded-xl"
                               style={{
                                 backfaceVisibility: "hidden",
-                                background: "linear-gradient(135deg, rgba(192,132,252,0.08), rgba(123,108,184,0.04))",
-                                border: "2px solid rgba(192,132,252,0.25)",
+                                border: "2px solid rgba(192,132,252,0.3)",
+                                boxShadow: "0 4px 20px rgba(45,27,105,0.25)",
                               }}
                             >
-                              <span className="text-3xl">{tarotCard.emoji}</span>
-                              <span
-                                className="mt-1.5 text-[0.6rem] font-bold text-center leading-tight px-1"
-                                style={{ color: "var(--text-primary)" }}
-                              >
-                                {tarotCard.name}
-                              </span>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={getCardImageUrl(tarotCard)}
+                                alt={tarotCard.name}
+                                className="h-full w-full object-cover"
+                                style={{
+                                  transform: tarotReversed ? "rotate(180deg)" : "none",
+                                }}
+                              />
                             </div>
                             {/* 背面（牌背） */}
                             <div
-                              className="absolute inset-0 flex items-center justify-center rounded-xl"
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl"
                               style={{
                                 backfaceVisibility: "hidden",
                                 transform: "rotateY(180deg)",
                                 background: "linear-gradient(135deg, #2d1b69, #4a2d8a)",
                                 border: "2px solid rgba(192,132,252,0.3)",
+                                boxShadow: "0 4px 20px rgba(45,27,105,0.3)",
                               }}
                             >
-                              <span style={{ opacity: 0.6, fontSize: 24 }}>✦</span>
+                              <span style={{ opacity: 0.5, fontSize: 32 }}>✦</span>
+                              <span style={{ opacity: 0.3, fontSize: 10, color: "#c084fc", letterSpacing: 2 }}>TAROT</span>
                             </div>
                           </motion.div>
                         </div>

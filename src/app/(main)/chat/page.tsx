@@ -9,7 +9,7 @@ import { generateChatImage, downloadBlob } from '@/lib/chat-image';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { annotateDataRefs } from '@/lib/annotate-data-refs';
-import { parseChatSections, type ChatSection } from '@/lib/parse-chat-sections';
+import { parseChatSections } from '@/lib/parse-chat-sections';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ShareModal from '@/components/ui/ShareModal';
@@ -594,122 +594,225 @@ function ChatContent() {
           )}
 
           {/* Messages */}
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-              style={{ animation: `fadeIn 0.3s ease-out ${Math.min(i * 0.05, 0.3)}s both` }}
-              onTouchStart={() => handleTouchStart(i)}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              onClick={selectMode ? () => toggleSelect(i) : undefined}
-              onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
-            >
-              {/* Selection checkbox */}
-              {selectMode && (
-                <div className="flex shrink-0 items-center pt-3">
-                  <div
-                    className="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
-                    style={selected.has(i)
-                      ? { background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
-                      : { borderColor: 'var(--border-default)', background: 'var(--bg-base)' }
-                    }
-                  >
-                    {selected.has(i) && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              )}
+          {messages.map((msg, i) => {
+            // Check if this assistant message has card sections
+            const cardSections = msg.role === 'assistant' && msg.content && (!streaming || i < messages.length - 1)
+              ? parseChatSections(msg.content)
+              : null;
 
-              {/* Avatar */}
-              {msg.role === 'assistant' && !selectMode && (
+            // ── Card-style layout (full-width, no bubble) ──
+            if (cardSections && cardSections.length > 0) {
+              return (
                 <div
-                  className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm text-white"
-                  style={{ background: 'var(--gradient-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.18)' }}
+                  key={i}
+                  style={{ animation: `fadeIn 0.3s ease-out ${Math.min(i * 0.05, 0.3)}s both` }}
+                  onTouchStart={() => handleTouchStart(i)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onClick={selectMode ? () => toggleSelect(i) : undefined}
+                  onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
                 >
-                  ✦
-                </div>
-              )}
+                  {/* Selection checkbox for card messages */}
+                  {selectMode && (
+                    <div className="flex shrink-0 items-center pb-2">
+                      <div
+                        className="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                        style={selected.has(i)
+                          ? { background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
+                          : { borderColor: 'var(--border-default)', background: 'var(--bg-base)' }
+                        }
+                      >
+                        {selected.has(i) && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Message bubble */}
-              <div
-                className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${selectMode && selected.has(i) ? 'ring-2' : ''}`}
-                style={{
-                  ...(msg.role === 'user'
-                    ? {
-                        background: 'var(--gradient-primary)',
-                        color: '#ffffff',
-                        borderBottomRightRadius: '6px',
-                        boxShadow: '0 2px 12px rgba(123,108,184,0.18)',
-                      }
-                    : {
-                        background: 'var(--bg-surface)',
-                        color: 'var(--text-primary)',
-                        borderBottomLeftRadius: '6px',
-                        border: '1px solid var(--border-subtle)',
-                      }),
-                  ...(selectMode && selected.has(i) ? { outline: '2px solid var(--accent-primary)', outlineOffset: '2px' } : {}),
-                }}
-              >
-                {msg.role === 'assistant' ? (
-                  msg.content ? (() => {
-                    const sections = !streaming || i < messages.length - 1 ? parseChatSections(msg.content) : null;
-                    if (sections && sections.length > 0) {
+                  {/* Card sections - full width */}
+                  <div className="space-y-3" onClick={handleGlossaryClick}>
+                    {cardSections.map((sec, si) => {
+                      const isSummary = sec.tag === 'SUMMARY';
                       return (
-                        <div className="space-y-3" onClick={handleGlossaryClick}>
-                          {sections.map((sec, si) => (
-                            <div
-                              key={si}
-                              className="rounded-xl px-3.5 py-3 transition-all"
+                        <div
+                          key={si}
+                          className="section-card overflow-hidden rounded-2xl"
+                          style={{
+                            background: isSummary
+                              ? `linear-gradient(135deg, ${sec.color}18, ${sec.color}08)`
+                              : 'var(--bg-base)',
+                            border: `1px solid ${sec.color}25`,
+                            borderLeft: `3px solid ${sec.color}`,
+                            boxShadow: isSummary
+                              ? `0 4px 20px ${sec.color}15, var(--shadow-card)`
+                              : 'var(--shadow-card)',
+                            animation: `fadeInUp 0.4s ease-out ${si * 0.08}s both`,
+                          }}
+                        >
+                          {/* Card header */}
+                          <div
+                            className="flex items-center gap-2.5 px-4 py-3"
+                            style={{
+                              borderBottom: `1px solid ${sec.color}12`,
+                              background: `linear-gradient(135deg, ${sec.color}10, transparent)`,
+                            }}
+                          >
+                            <span
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
                               style={{
-                                background: `linear-gradient(135deg, ${sec.color}08, ${sec.color}03)`,
-                                border: `1px solid ${sec.color}20`,
+                                background: `linear-gradient(135deg, ${sec.color}, ${sec.color}cc)`,
+                                color: '#fff',
+                                boxShadow: `0 2px 8px ${sec.color}30`,
                               }}
                             >
-                              <div className="mb-2 flex items-center gap-2">
-                                <span
-                                  className="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-white"
-                                  style={{ background: sec.color }}
+                              {sec.icon}
+                            </span>
+                            <span className="text-[13px] font-semibold tracking-wide" style={{ color: sec.color }}>
+                              {sec.title}
+                            </span>
+                          </div>
+                          {/* Card body with structured sub-sections */}
+                          <div className="px-4 py-3 space-y-2.5">
+                            {sec.parts.length > 0 ? sec.parts.map((part, pi) => {
+                              if (part.type === 'text') {
+                                return (
+                                  <div
+                                    key={pi}
+                                    className="prose-chat text-[13px] leading-[1.8]"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
+                                  />
+                                );
+                              }
+                              const partStyle = {
+                                data:    { bg: 'rgba(123,108,184,0.06)', border: 'rgba(123,108,184,0.12)', iconBg: '#7b6cb8' },
+                                insight: { bg: 'rgba(94,216,207,0.06)',  border: 'rgba(94,216,207,0.12)',  iconBg: '#3abfb6' },
+                                advice:  { bg: 'rgba(184,150,62,0.06)', border: 'rgba(184,150,62,0.12)',  iconBg: '#b8963e' },
+                              }[part.type] || { bg: 'transparent', border: 'transparent', iconBg: '#999' };
+                              return (
+                                <div
+                                  key={pi}
+                                  className="rounded-xl px-3 py-2.5"
+                                  style={{ background: partStyle.bg, border: `1px solid ${partStyle.border}` }}
                                 >
-                                  {sec.icon}
-                                </span>
-                                <span className="text-sm font-medium" style={{ color: sec.color }}>
-                                  {sec.title}
-                                </span>
-                              </div>
+                                  <div className="mb-1 flex items-center gap-1.5">
+                                    <span
+                                      className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px]"
+                                      style={{ background: partStyle.iconBg, color: '#fff' }}
+                                    >
+                                      {part.emoji}
+                                    </span>
+                                    <span className="text-[11px] font-medium" style={{ color: partStyle.iconBg, opacity: 0.8 }}>
+                                      {part.label}
+                                    </span>
+                                  </div>
+                                  <div
+                                    className="prose-chat text-[13px] leading-[1.75]"
+                                    style={{ color: 'var(--text-primary)' }}
+                                    dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(part.content)), getChartData()) }}
+                                  />
+                                </div>
+                              );
+                            }) : (
                               <div
-                                className="prose-chat text-sm leading-relaxed"
+                                className="prose-chat text-[13px] leading-[1.8]"
+                                style={{ color: 'var(--text-primary)' }}
                                 dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
                               />
-                            </div>
-                          ))}
+                            )}
+                          </div>
                         </div>
                       );
-                    }
-                    // Fallback: plain rendering (during streaming or when no section markers)
-                    return (
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // ── Normal bubble layout (user messages + plain assistant messages) ──
+            return (
+              <div
+                key={i}
+                className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                style={{ animation: `fadeIn 0.3s ease-out ${Math.min(i * 0.05, 0.3)}s both` }}
+                onTouchStart={() => handleTouchStart(i)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onClick={selectMode ? () => toggleSelect(i) : undefined}
+                onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
+              >
+                {/* Selection checkbox */}
+                {selectMode && (
+                  <div className="flex shrink-0 items-center pt-3">
+                    <div
+                      className="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                      style={selected.has(i)
+                        ? { background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.25)' }
+                        : { borderColor: 'var(--border-default)', background: 'var(--bg-base)' }
+                      }
+                    >
+                      {selected.has(i) && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Avatar */}
+                {msg.role === 'assistant' && !selectMode && (
+                  <div
+                    className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm text-white"
+                    style={{ background: 'var(--gradient-primary)', boxShadow: '0 2px 8px rgba(123,108,184,0.18)' }}
+                  >
+                    ✦
+                  </div>
+                )}
+
+                {/* Message bubble */}
+                <div
+                  className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${selectMode && selected.has(i) ? 'ring-2' : ''}`}
+                  style={{
+                    ...(msg.role === 'user'
+                      ? {
+                          background: 'var(--gradient-primary)',
+                          color: '#ffffff',
+                          borderBottomRightRadius: '6px',
+                          boxShadow: '0 2px 12px rgba(123,108,184,0.18)',
+                        }
+                      : {
+                          background: 'var(--bg-surface)',
+                          color: 'var(--text-primary)',
+                          borderBottomLeftRadius: '6px',
+                          border: '1px solid var(--border-subtle)',
+                        }),
+                    ...(selectMode && selected.has(i) ? { outline: '2px solid var(--accent-primary)', outlineOffset: '2px' } : {}),
+                  }}
+                >
+                  {msg.role === 'assistant' ? (
+                    msg.content ? (
                       <div
                         className="prose-chat"
                         onClick={handleGlossaryClick}
                         dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(msg.content)), getChartData()) }}
                       />
-                    );
-                  })() : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
-                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
-                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.6s' }} />
-                    </div>
-                  )
-                ) : (
-                  <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
-                )}
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
+                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.6s' }} />
+                      </div>
+                    )
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Suggestions */}
           {suggestions.length > 0 && !streaming && !selectMode && (
@@ -864,6 +967,13 @@ function ChatContent() {
           vertical-align: super;
           font-weight: 600;
           opacity: 0.85;
+        }
+        /* ── Section card sub-structure: 📊🔮💡 ── */
+        .section-card-body p {
+          margin: 0 0 6px;
+        }
+        .section-card-body p:last-child {
+          margin-bottom: 0;
         }
       `}</style>
     </div>

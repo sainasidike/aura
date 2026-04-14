@@ -2,7 +2,15 @@
  * 解析 AI 占星师的分段输出为结构化卡片数据
  *
  * AI 按 ---TAG--- 标题 格式输出，前端解析后渲染为可视化卡片。
+ * 每个板块包含 📊数据 🔮解读 💡建议 三个子结构。
  */
+
+export interface SectionPart {
+  type: 'data' | 'insight' | 'advice' | 'text';
+  emoji: string;
+  label: string;
+  content: string;
+}
 
 export interface ChatSection {
   tag: string;
@@ -10,6 +18,8 @@ export interface ChatSection {
   icon: string;
   color: string;
   content: string;
+  /** Structured sub-parts (📊🔮💡) if found */
+  parts: SectionPart[];
 }
 
 const SECTION_META: Record<string, { icon: string; color: string }> = {
@@ -30,6 +40,53 @@ const SECTION_META: Record<string, { icon: string; color: string }> = {
 
 // Match: ---TAG--- optional title text
 const SECTION_RE = /^---([A-Z_]+)---\s*(.*)/;
+
+// Match emoji sub-section markers: 📊 数据：... / 🔮 解读：... / 💡 建议：...
+const PART_PATTERNS: { re: RegExp; type: SectionPart['type']; emoji: string; label: string }[] = [
+  { re: /^📊\s*(?:数据[：:]?\s*)/, type: 'data', emoji: '📊', label: '数据' },
+  { re: /^🔮\s*(?:解读[：:]?\s*)/, type: 'insight', emoji: '🔮', label: '解读' },
+  { re: /^💡\s*(?:建议[：:]?\s*)/, type: 'advice', emoji: '💡', label: '建议' },
+];
+
+/**
+ * 将单个 section 的内容解析为结构化子部分（📊🔮💡）
+ */
+function parseContentParts(content: string): SectionPart[] {
+  const lines = content.split('\n');
+  const parts: SectionPart[] = [];
+  let current: SectionPart | null = null;
+
+  for (const line of lines) {
+    let matched = false;
+    for (const pat of PART_PATTERNS) {
+      if (pat.re.test(line)) {
+        if (current) parts.push(current);
+        const text = line.replace(pat.re, '').trim();
+        current = { type: pat.type, emoji: pat.emoji, label: pat.label, content: text };
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      if (current) {
+        current.content += (current.content ? '\n' : '') + line;
+      } else {
+        // Text before any emoji marker
+        if (line.trim()) {
+          parts.push({ type: 'text', emoji: '', label: '', content: line });
+        }
+      }
+    }
+  }
+  if (current) parts.push(current);
+
+  // Trim all parts
+  for (const p of parts) {
+    p.content = p.content.trim();
+  }
+
+  return parts.filter(p => p.content);
+}
 
 /**
  * 解析 AI 输出文本为分段卡片数据
@@ -53,6 +110,7 @@ export function parseChatSections(text: string): ChatSection[] | null {
         icon: meta.icon,
         color: meta.color,
         content: '',
+        parts: [],
       };
     } else if (current) {
       current.content += (current.content ? '\n' : '') + line;
@@ -64,9 +122,10 @@ export function parseChatSections(text: string): ChatSection[] | null {
   // If no sections found, return null to fall back to plain rendering
   if (sections.length === 0) return null;
 
-  // Trim trailing whitespace from each section
+  // Trim and parse sub-parts for each section
   for (const s of sections) {
     s.content = s.content.trim();
+    s.parts = parseContentParts(s.content);
   }
 
   return sections;

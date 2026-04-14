@@ -9,6 +9,7 @@ import { generateChatImage, downloadBlob } from '@/lib/chat-image';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
 import { simpleMarkdown } from '@/lib/simple-markdown';
 import { annotateDataRefs } from '@/lib/annotate-data-refs';
+import { parseChatSections, type ChatSection } from '@/lib/parse-chat-sections';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ShareModal from '@/components/ui/ShareModal';
@@ -653,24 +654,59 @@ function ChatContent() {
                   ...(selectMode && selected.has(i) ? { outline: '2px solid var(--accent-primary)', outlineOffset: '2px' } : {}),
                 }}
               >
-                <div className={msg.role === 'assistant' ? 'prose-chat' : 'whitespace-pre-wrap'}>
-                  {msg.role === 'assistant' ? (
-                    msg.content ? (
+                {msg.role === 'assistant' ? (
+                  msg.content ? (() => {
+                    const sections = !streaming || i < messages.length - 1 ? parseChatSections(msg.content) : null;
+                    if (sections && sections.length > 0) {
+                      return (
+                        <div className="space-y-3" onClick={handleGlossaryClick}>
+                          {sections.map((sec, si) => (
+                            <div
+                              key={si}
+                              className="rounded-xl px-3.5 py-3 transition-all"
+                              style={{
+                                background: `linear-gradient(135deg, ${sec.color}08, ${sec.color}03)`,
+                                border: `1px solid ${sec.color}20`,
+                              }}
+                            >
+                              <div className="mb-2 flex items-center gap-2">
+                                <span
+                                  className="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-white"
+                                  style={{ background: sec.color }}
+                                >
+                                  {sec.icon}
+                                </span>
+                                <span className="text-sm font-medium" style={{ color: sec.color }}>
+                                  {sec.title}
+                                </span>
+                              </div>
+                              <div
+                                className="prose-chat text-sm leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(sec.content)), getChartData()) }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    // Fallback: plain rendering (during streaming or when no section markers)
+                    return (
                       <div
+                        className="prose-chat"
                         onClick={handleGlossaryClick}
                         dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(msg.content)), getChartData()) }}
                       />
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
-                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
-                        <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.6s' }} />
-                      </div>
-                    )
-                  ) : (
-                    msg.content || '...'
-                  )}
-                </div>
+                    );
+                  })() : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
+                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
+                      <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.6s' }} />
+                    </div>
+                  )
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
+                )}
               </div>
             </div>
           ))}

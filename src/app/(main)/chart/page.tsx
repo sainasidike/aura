@@ -19,6 +19,9 @@ const AI_REPORTS = [
 
 const INTERACTIVE = [
   { href: '/chart/compatibility', icon: '♡♡', iconBg: 'linear-gradient(135deg, #e0609018, #d0709008)', iconColor: '#d06080', title: '合盘配对', desc: '双人星盘配对分析' },
+  { href: '/chart/composite', icon: '◎', iconBg: 'linear-gradient(135deg, #9070b018, #9070b008)', iconColor: '#9070b0', title: '组合盘', desc: '关系本身的能量分析' },
+  { href: '/chart/davison', icon: '⌖', iconBg: 'linear-gradient(135deg, #5090d018, #5090d008)', iconColor: '#5090d0', title: '时空中点盘', desc: '关系的先天命运分析' },
+  { href: '/chart/overlay', icon: '◆', iconBg: 'linear-gradient(135deg, #c0805018, #c0805008)', iconColor: '#c08050', title: '马盘', desc: '行星落宫互动分析' },
 ];
 
 const COMING_SOON = ['MBTI 测试', '生命数字', '占星骰子'];

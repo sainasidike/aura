@@ -5,6 +5,7 @@ const REPORT_LABELS: Record<string, string> = {
   synastry: '合盘配对报告',
   composite: '组合盘报告',
   davison: '时空中点盘报告',
+  overlay: '马盘报告',
 };
 
 export async function POST(request: NextRequest) {

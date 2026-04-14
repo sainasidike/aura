@@ -679,3 +679,29 @@ export function calculateDavison(
   const chart = calculateChartFromDate(midTime, midLat, midLon);
   return { chart, midpointDate: midTime };
 }
+
+/* ═══════════════════════════════════════ */
+/* 马盘 / 行星落宫覆盖 (Planet Overlay)    */
+/* ═══════════════════════════════════════ */
+
+/**
+ * 计算马盘 (行星落宫覆盖)
+ * 将 A 的行星放入 B 的宫位体系，显示 A 的能量如何影响 B 的生活领域
+ */
+export function calculateOverlay(
+  chartA: AstrologyChart,
+  chartB: AstrologyChart,
+): AstrologyChart {
+  const planets: PlanetPosition[] = chartA.planets.map(p => ({
+    ...p,
+    house: getHouseNumber(p.longitude, chartB.houses),
+  }));
+
+  return {
+    planets,
+    houses: chartB.houses,
+    aspects: calculateAspects(planets),
+    ascendant: chartB.ascendant,
+    midheaven: chartB.midheaven,
+  };
+}

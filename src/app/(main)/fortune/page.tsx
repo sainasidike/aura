@@ -73,34 +73,28 @@ function parseInterpretations(text: string): Record<string, string> {
 }
 
 function InterpretationText({ text }: { text: string }) {
-  const lines = text.split("\n");
+  // Merge all lines into a single continuous paragraph
+  const merged = text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => l.replace(/\*\*/g, ""))
+    .join(" ");
+
   return (
-    <div className="space-y-2">
-      {lines.map((line, i) => {
-        const trimmed = line.trim();
-        if (!trimmed) return null;
-        if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
-          return <h4 key={i} className="mt-3 text-[0.8rem] font-bold" style={{ color: "var(--text-primary)" }}>{trimmed.replace(/\*\*/g, "")}</h4>;
-        }
-        if (trimmed.startsWith("📌")) {
-          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(123,108,184,0.06)", borderLeft: "3px solid var(--accent-primary)" }}><span className="text-xs font-bold" style={{ color: "var(--accent-primary)" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
-        }
-        if (trimmed.startsWith("💡")) {
-          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(75,201,160,0.06)", borderLeft: "3px solid #4bc9a0" }}><span className="text-xs font-bold" style={{ color: "#4bc9a0" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
-        }
-        if (trimmed.startsWith("⚠️")) {
-          return <div key={i} className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(232,93,93,0.06)", borderLeft: "3px solid #e85d5d" }}><span className="text-xs font-bold" style={{ color: "#e85d5d" }}>{trimmed.replace(/\*\*/g, "")}</span></div>;
-        }
-        if (trimmed.startsWith("- ")) {
-          return (
-            <div key={i} className="flex gap-2 pl-3">
-              <span className="mt-1 text-[0.55rem]" style={{ color: "var(--accent-primary-light)" }}>●</span>
-              <p className="flex-1 text-[0.8rem] leading-6" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}>{trimmed.slice(2)}</p>
-            </div>
-          );
-        }
-        return <p key={i} className="text-[0.8rem] leading-7" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}>{trimmed.replace(/\*\*/g, "")}</p>;
-      })}
+    <div
+      className="rounded-2xl px-4 py-3"
+      style={{
+        background: "rgba(123,108,184,0.04)",
+        borderLeft: "3px solid var(--accent-primary)",
+      }}
+    >
+      <p
+        className="text-[0.8rem] leading-7"
+        style={{ color: "var(--text-secondary)", fontFamily: "var(--font-cn-body)" }}
+      >
+        {merged}
+      </p>
     </div>
   );
 }

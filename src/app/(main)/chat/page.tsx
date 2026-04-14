@@ -14,12 +14,34 @@ import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import ShareModal from '@/components/ui/ShareModal';
+
+type ChartType = 'natal' | 'transit' | 'solar_return' | 'lunar_return';
+
+const CHART_TYPE_LABELS: Record<ChartType, string> = {
+  natal: '本命盘',
+  transit: '行运盘',
+  solar_return: '日返盘（年运）',
+  lunar_return: '月返盘（月运）',
+};
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: number;
+  chartType?: ChartType;
+}
+
+/** 根据用户提问内容自动推断应使用的星盘类型 */
+function detectChartType(question: string): ChartType {
+  const q = question.toLowerCase();
+  // 月运 / 本月 / 这个月 → 月返盘
+  if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返/.test(q)) return 'lunar_return';
+  // 年运 / 今年 / 明年 / 2025年 / 流年 → 日返盘
+  if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'solar_return';
+  // 行运 / 最近运势 / 近期 / 当前 / 这段时间 → 行运盘
+  if (/行运|最近|近期|当前|目前|这段时间|现在|眼下|运势|未来/.test(q)) return 'transit';
+  // 默认本命盘
+  return 'natal';
 }
 
 const COLD_START_QUESTIONS = [
@@ -78,8 +100,6 @@ function ChatContent() {
 
   // Modals
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const profileIdRef = useRef<string | null>(null);
@@ -226,13 +246,19 @@ function ChatContent() {
   const sendMessage = async (content: string) => {
     if (!content.trim() || streaming) return;
 
+    // Auto-detect which chart type to use based on the question
+    const detectedType = astroContext?.analysisType
+      ? (astroContext.analysisType as ChartType)
+      : detectChartType(content.trim());
+    const analysisType = detectedType === 'natal' ? undefined : detectedType;
+
     const userMsg: Message = { role: 'user', content: content.trim(), timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setSuggestions([]);
     setStreaming(true);
 
-    setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: Date.now() }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: Date.now(), chartType: detectedType }]);
 
     try {
       const res = await fetch('/api/chat', {
@@ -241,7 +267,7 @@ function ChatContent() {
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
           chartData: getChartData(),
-          ...(astroContext?.analysisType ? { analysisType: astroContext.analysisType } : {}),
+          ...(analysisType ? { analysisType } : {}),
         }),
       });
 
@@ -416,15 +442,26 @@ function ChatContent() {
     setTimeout(() => sendMessage(userContent), 50);
   };
 
-  const handleShareSingle = (msgIndex: number) => {
-    // Enter select mode with this message and its preceding user message pre-selected
+  const handleShareSingle = async (msgIndex: number) => {
+    // Select this message and its preceding user message, then directly save as image
+    if (!profile) return;
     const sel = new Set<number>([msgIndex]);
     for (let j = msgIndex - 1; j >= 0; j--) {
       if (messages[j].role === 'user') { sel.add(j); break; }
     }
-    setSelectMode(true);
-    setSelected(sel);
-    setShowShare(true);
+    const msgs = messages.filter((_, i) => sel.has(i));
+    showToast('正在生成图片...');
+    try {
+      const blob = await generateChatImage({
+        messages: msgs,
+        profileName: profile.name,
+        modeName: 'AI 占星师',
+      });
+      downloadBlob(blob, `AI占星师_${profile.name}_${Date.now()}.png`);
+      showToast('图片已保存');
+    } catch {
+      showToast('图片生成失败');
+    }
   };
 
   // ─── Share helpers ───
@@ -435,18 +472,9 @@ function ChatContent() {
     return messages;
   };
 
-  const handleCopyText = () => {
-    const msgs = getShareMessages();
-    const text = msgs.map(m => `${m.role === 'user' ? '我' : 'AI占星师'}：${m.content}`).join('\n\n');
-    navigator.clipboard.writeText(text);
-    setShowShare(false);
-    if (selectMode) exitSelectMode();
-    showToast('已复制到剪贴板');
-  };
-
   const handleSaveImage = async () => {
     if (!profile) return;
-    setImageLoading(true);
+    showToast('正在生成图片...');
     try {
       const msgs = getShareMessages();
       const blob = await generateChatImage({
@@ -455,13 +483,11 @@ function ChatContent() {
         modeName: 'AI 占星师',
       });
       downloadBlob(blob, `AI占星师_${profile.name}_${Date.now()}.png`);
-      setShowShare(false);
       if (selectMode) exitSelectMode();
       showToast('图片已保存');
     } catch {
       showToast('图片生成失败');
     }
-    setImageLoading(false);
   };
 
   // ─── Render ───
@@ -514,7 +540,7 @@ function ChatContent() {
                 {messages.length > 0 && (
                   <div className="flex items-center gap-0.5">
                     <button
-                      onClick={() => setShowShare(true)}
+                      onClick={() => handleSaveImage()}
                       className="rounded-lg p-2 transition-colors"
                       style={{ color: 'var(--text-tertiary)' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)'; }}
@@ -648,8 +674,17 @@ function ChatContent() {
 
             // ── Card-style layout with left-right split ──
             if (cardSections && cardSections.length > 0) {
-              const natalChart = (getChartData()?.natalChart) as AstrologyChart | undefined;
-              const natalPlanets = natalChart?.planets;
+              const data = getChartData();
+              const ct = msg.chartType || 'natal';
+              // Pick the chart matching the detected type
+              const displayChart: AstrologyChart | undefined = (() => {
+                if (ct === 'solar_return') return (data?.solarReturn as Record<string, unknown>)?.chart as AstrologyChart | undefined;
+                if (ct === 'lunar_return') return (data?.lunarReturn as Record<string, unknown>)?.chart as AstrologyChart | undefined;
+                if (ct === 'transit') return (data?.transitChart as AstrologyChart | undefined) || (data?.natalChart as AstrologyChart | undefined);
+                return data?.natalChart as AstrologyChart | undefined;
+              })();
+              const displayPlanets = displayChart?.planets;
+              const chartLabel = CHART_TYPE_LABELS[ct];
 
               return (
                 <div
@@ -684,24 +719,30 @@ function ChatContent() {
                   <div className="flex flex-col md:flex-row md:gap-5">
 
                     {/* ── LEFT: Chart panel ── */}
-                    {natalChart && (
+                    {displayChart && (
                       <div className="mb-4 md:mb-0 md:w-[280px] md:shrink-0">
                         <div
                           className="overflow-hidden rounded-2xl md:sticky md:top-[76px]"
                           style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}
                         >
-                          {/* Mobile: collapsible header */}
+                          {/* Chart type label */}
+                          <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: 'linear-gradient(135deg, rgba(123,108,184,0.08), transparent)', borderBottom: '1px solid var(--border-subtle)' }}>
+                            <span className="flex h-5 w-5 items-center justify-center rounded-md text-[10px] text-white" style={{ background: 'var(--gradient-primary)' }}>
+                              {ct === 'solar_return' ? '☉' : ct === 'lunar_return' ? '☽' : ct === 'transit' ? '⟳' : '✦'}
+                            </span>
+                            <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{chartLabel}</span>
+                          </div>
+
+                          {/* Mobile: collapsible toggle */}
                           <button
-                            className="flex w-full items-center justify-between px-4 py-3 md:hidden"
-                            style={{ background: 'linear-gradient(135deg, rgba(123,108,184,0.06), transparent)' }}
+                            className="flex w-full items-center justify-between px-4 py-2 md:hidden"
                             onClick={(e) => { e.stopPropagation(); setChartExpanded(v => !v); }}
                           >
-                            <span className="flex items-center gap-2">
-                              <span className="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-white" style={{ background: 'var(--gradient-primary)' }}>☉</span>
-                              <span className="text-[13px] font-semibold" style={{ color: 'var(--accent-primary)' }}>星盘数据</span>
+                            <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                              {chartExpanded ? '收起星盘' : '展开星盘'}
                             </span>
                             <svg
-                              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round"
+                              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round"
                               style={{ transform: chartExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
                             >
                               <polyline points="6 9 12 15 18 9" />
@@ -713,18 +754,18 @@ function ChatContent() {
                             {/* SVG Chart */}
                             <div className="flex justify-center px-3 py-3" style={{ background: 'linear-gradient(180deg, rgba(123,108,184,0.03), transparent)' }}>
                               <div style={{ maxWidth: '240px', width: '100%' }}>
-                                <NatalChartSVG chart={natalChart} hideAskAI />
+                                <NatalChartSVG chart={displayChart} hideAskAI />
                               </div>
                             </div>
 
                             {/* Planet summary table */}
-                            {natalPlanets && natalPlanets.length > 0 && (
+                            {displayPlanets && displayPlanets.length > 0 && (
                               <div className="border-t px-3 py-2.5" style={{ borderColor: 'var(--border-subtle)' }}>
                                 <p className="mb-2 text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
                                   行星位置
                                 </p>
                                 <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                                  {natalPlanets.slice(0, 10).map((p) => (
+                                  {displayPlanets.slice(0, 10).map((p) => (
                                     <div key={p.name} className="flex items-center gap-1.5 text-[11px]">
                                       <span style={{ color: 'var(--accent-primary)', fontWeight: 600, width: '24px' }}>
                                         {p.name.slice(0, 2)}
@@ -740,9 +781,9 @@ function ChatContent() {
                                 </div>
                                 {/* Key angles */}
                                 <div className="mt-2 flex gap-3 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-                                  <span>ASC {natalChart.ascendant.toFixed(1)}°</span>
-                                  <span>MC {natalChart.midheaven.toFixed(1)}°</span>
-                                  <span>{natalChart.aspects?.length || 0} 相位</span>
+                                  <span>ASC {displayChart.ascendant.toFixed(1)}°</span>
+                                  <span>MC {displayChart.midheaven.toFixed(1)}°</span>
+                                  <span>{displayChart.aspects?.length || 0} 相位</span>
                                 </div>
                               </div>
                             )}
@@ -935,34 +976,7 @@ function ChatContent() {
             );
           })}
 
-          {/* Suggestions */}
-          {suggestions.length > 0 && !streaming && !selectMode && (
-            <div className="stagger-children flex flex-col gap-2 pl-10 pt-1">
-              {suggestions.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => sendMessage(q)}
-                  className="group flex items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm transition-all"
-                  style={{
-                    border: '1px solid var(--border-default)',
-                    background: 'var(--bg-base)',
-                    color: 'var(--accent-primary)',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-default)';
-                  }}
-                >
-                  <span className="text-xs" style={{ color: 'var(--accent-primary-light)' }}>→</span>
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Suggestions removed from here — moved to bottom bar */}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -983,7 +997,7 @@ function ChatContent() {
           /* ── Selection action bar ── */
           <div className="mx-auto flex max-w-2xl gap-3">
             <button
-              onClick={() => setShowShare(true)}
+              onClick={() => handleSaveImage()}
               disabled={selected.size === 0}
               className="flex-1 rounded-xl py-3 text-sm font-medium transition-all disabled:opacity-30"
               style={{ background: 'var(--accent-primary)', color: '#fff', boxShadow: '0 2px 12px rgba(123,108,184,0.20)' }}
@@ -1001,7 +1015,31 @@ function ChatContent() {
           </div>
         ) : (
           /* ── Normal input ── */
-          <div className="mx-auto flex max-w-2xl gap-2.5">
+          <div className="mx-auto max-w-2xl">
+            {/* Suggested questions chips */}
+            {suggestions.length > 0 && !streaming && (
+              <div className="mb-2 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {suggestions.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(q)}
+                    className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all active:scale-95"
+                    style={{
+                      background: 'rgba(123,108,184,0.08)',
+                      color: 'var(--accent-primary)',
+                      border: '1px solid rgba(123,108,184,0.15)',
+                      maxWidth: '200px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2.5">
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -1028,6 +1066,7 @@ function ChatContent() {
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
             </button>
+            </div>
           </div>
         )}
       </div>
@@ -1043,13 +1082,6 @@ function ChatContent() {
         onCancel={() => setShowConfirm(false)}
       />
 
-      <ShareModal
-        open={showShare}
-        loading={imageLoading}
-        onClose={() => setShowShare(false)}
-        onCopyText={handleCopyText}
-        onSaveImage={handleSaveImage}
-      />
 
       {/* Glossary Popup */}
       <GlossaryPopup

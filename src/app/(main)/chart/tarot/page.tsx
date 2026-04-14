@@ -428,7 +428,7 @@ export default function TarotPage() {
             </div>
 
             {/* Custom input */}
-            <div className="flex gap-2.5">
+            <div className="flex gap-2.5 mb-20">
               <input
                 value={customInput}
                 onChange={e => setCustomInput(e.target.value)}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
+import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#5090d0';
@@ -49,6 +50,15 @@ function DavisonContent() {
     try {
       const d = chartData as { davison: AstrologyChart };
       if (d.davison?.ascendant != null) return getAscendantInfo(d.davison);
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
+
+  const davisonChart = useMemo<AstrologyChart | null>(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { davison: AstrologyChart };
+      if (d.davison?.planets && d.davison?.houses && d.davison?.aspects) return d.davison;
     } catch { /* */ }
     return null;
   }, [chartData]);
@@ -342,6 +352,13 @@ function DavisonContent() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Chart Wheel */}
+        {davisonChart && (
+          <div className="mb-4 animate-fadeIn rounded-2xl p-4 flex justify-center" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+            <NatalChartSVG chart={davisonChart} hideAskAI />
           </div>
         )}
 

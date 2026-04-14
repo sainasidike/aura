@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
+import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#9070b0';
@@ -49,6 +50,15 @@ function CompositeContent() {
     try {
       const d = chartData as { composite: AstrologyChart };
       if (d.composite?.ascendant != null) return getAscendantInfo(d.composite);
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
+
+  const compositeChart = useMemo<AstrologyChart | null>(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { composite: AstrologyChart };
+      if (d.composite?.planets && d.composite?.houses && d.composite?.aspects) return d.composite;
     } catch { /* */ }
     return null;
   }, [chartData]);
@@ -330,6 +340,13 @@ function CompositeContent() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Chart Wheel */}
+        {compositeChart && (
+          <div className="mb-4 animate-fadeIn rounded-2xl p-4 flex justify-center" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+            <NatalChartSVG chart={compositeChart} hideAskAI />
           </div>
         )}
 

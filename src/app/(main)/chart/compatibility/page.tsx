@@ -6,6 +6,7 @@ import { getProfiles, type StoredProfile } from '@/lib/storage';
 import ShareModal from '@/components/ui/ShareModal';
 import { extractChartSummary, getAscendantInfo, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
+import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
 const LOVE_COLOR = '#d07090';
@@ -113,6 +114,24 @@ function CompatibilityContent() {
     try {
       const d = davisonData as { davison: AstrologyChart };
       if (d.davison?.ascendant != null) return getAscendantInfo(d.davison);
+    } catch { /* */ }
+    return null;
+  }, [davisonData]);
+
+  const compositeChartObj = useMemo<AstrologyChart | null>(() => {
+    if (!compositeData) return null;
+    try {
+      const d = compositeData as { composite: AstrologyChart };
+      if (d.composite?.planets && d.composite?.houses && d.composite?.aspects) return d.composite;
+    } catch { /* */ }
+    return null;
+  }, [compositeData]);
+
+  const davisonChartObj = useMemo<AstrologyChart | null>(() => {
+    if (!davisonData) return null;
+    try {
+      const d = davisonData as { davison: AstrologyChart };
+      if (d.davison?.planets && d.davison?.houses && d.davison?.aspects) return d.davison;
     } catch { /* */ }
     return null;
   }, [davisonData]);
@@ -963,6 +982,12 @@ function CompatibilityContent() {
                       </div>
                     </div>
                   )}
+                  {/* Composite chart wheel */}
+                  {compositeChartObj && (
+                    <div className="mx-5 mt-3 mb-2 flex justify-center">
+                      <NatalChartSVG chart={compositeChartObj} hideAskAI />
+                    </div>
+                  )}
                   {compositeReport && (() => {
                     const { preamble, sections } = parseReportSections(compositeReport);
                     const icons = SECTION_ICONS.composite;
@@ -1079,6 +1104,12 @@ function CompatibilityContent() {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {/* Davison chart wheel */}
+                  {davisonChartObj && (
+                    <div className="mx-5 mt-3 mb-2 flex justify-center">
+                      <NatalChartSVG chart={davisonChartObj} hideAskAI />
                     </div>
                   )}
                   {davisonReport && (() => {

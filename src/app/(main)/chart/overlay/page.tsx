@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getProfiles, type StoredProfile } from '@/lib/storage';
 import { extractChartSummary, formatDegree, parseReportSections, SECTION_ICONS, type ChartSummary } from '@/lib/dual-chart-utils';
 import { simpleMarkdown } from '@/lib/simple-markdown';
+import { NatalChartSVG } from '@/components/chart/AstrologyComponents';
 import type { AstrologyChart } from '@/types';
 
 const ACCENT = '#c08050';
@@ -30,10 +31,20 @@ function OverlayContent() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [overlayTab, setOverlayTab] = useState<'aToB' | 'bToA'>('aToB');
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const cacheKey = (selectedA && selectedB) ? `overlay_${selectedA.id}_${selectedB.id}` : '';
+
+  const overlayCharts = useMemo<{ aToB: AstrologyChart; bToA: AstrologyChart } | null>(() => {
+    if (!chartData) return null;
+    try {
+      const d = chartData as { overlayAtoB: AstrologyChart; overlayBtoA: AstrologyChart };
+      if (d.overlayAtoB?.planets && d.overlayBtoA?.planets) return { aToB: d.overlayAtoB, bToA: d.overlayBtoA };
+    } catch { /* */ }
+    return null;
+  }, [chartData]);
 
   const overlaySummary = useMemo<{ aToB: ChartSummary; bToA: ChartSummary } | null>(() => {
     if (!chartData) return null;
@@ -325,6 +336,27 @@ function OverlayContent() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chart Wheels — tab toggle between A→B and B→A */}
+        {overlayCharts && (
+          <div className="mb-4 animate-fadeIn rounded-2xl overflow-hidden" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+            <div className="flex border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <button onClick={() => setOverlayTab('aToB')}
+                className="flex-1 py-2.5 text-xs font-medium transition"
+                style={{ color: overlayTab === 'aToB' ? ACCENT : 'var(--text-tertiary)', borderBottom: overlayTab === 'aToB' ? `2px solid ${ACCENT}` : '2px solid transparent' }}>
+                {selectedA?.name} → {selectedB?.name}
+              </button>
+              <button onClick={() => setOverlayTab('bToA')}
+                className="flex-1 py-2.5 text-xs font-medium transition"
+                style={{ color: overlayTab === 'bToA' ? ACCENT : 'var(--text-tertiary)', borderBottom: overlayTab === 'bToA' ? `2px solid ${ACCENT}` : '2px solid transparent' }}>
+                {selectedB?.name} → {selectedA?.name}
+              </button>
+            </div>
+            <div className="flex justify-center p-4">
+              <NatalChartSVG chart={overlayTab === 'aToB' ? overlayCharts.aToB : overlayCharts.bToA} hideAskAI />
             </div>
           </div>
         )}

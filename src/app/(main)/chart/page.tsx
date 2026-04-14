@@ -1,12 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const CHART_TOOLS = [
-  { href: '/chart/astrology', icon: '☉', iconBg: 'linear-gradient(135deg, #e8838318, #e8838308)', iconColor: '#d06060', title: '专业星盘', desc: '20+ 种星盘排盘' },
-  { href: '/chart/tarot', icon: '⊡', iconBg: 'linear-gradient(135deg, #b07cd018, #b07cd008)', iconColor: '#9070b0', title: '塔罗牌', desc: 'AI 塔罗解读' },
-  { href: '/chart/ziwei', icon: '☆', iconBg: 'linear-gradient(135deg, #d0a03018, #d0a03008)', iconColor: '#c09030', title: '紫微斗数', desc: '紫微排盘 + 解读' },
-  { href: '/chart/bazi', icon: '☰', iconBg: 'linear-gradient(135deg, #70a08018, #70a08008)', iconColor: '#609070', title: '国学八字', desc: '八字排盘 + 解读' },
+  { href: '/chart/astrology', icon: '☉', iconBg: 'linear-gradient(135deg, #e8838318, #e8838308)', iconColor: '#d06060', title: '专业星盘', desc: '20+ 种星盘排盘', comingSoon: false },
+  { href: '/chart/tarot', icon: '⊡', iconBg: 'linear-gradient(135deg, #b07cd018, #b07cd008)', iconColor: '#9070b0', title: '塔罗牌', desc: 'AI 塔罗解读', comingSoon: false },
+  { href: '/chart/ziwei', icon: '☆', iconBg: 'linear-gradient(135deg, #d0a03018, #d0a03008)', iconColor: '#c09030', title: '紫微斗数', desc: '紫微排盘 + 解读', comingSoon: true },
+  { href: '/chart/bazi', icon: '☰', iconBg: 'linear-gradient(135deg, #70a08018, #70a08008)', iconColor: '#609070', title: '国学八字', desc: '八字排盘 + 解读', comingSoon: true },
 ];
 
 const AI_REPORTS = [
@@ -23,6 +24,14 @@ const INTERACTIVE = [
 const COMING_SOON = ['MBTI 测试', '生命数字', '占星骰子'];
 
 export default function ToolsPage() {
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   return (
     <div className="min-h-screen px-5 py-6 pb-24">
       <div className="mx-auto max-w-2xl">
@@ -35,7 +44,24 @@ export default function ToolsPage() {
         <section className="mb-8">
           <h2 className="mb-3 text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>排盘工具</h2>
           <div className="stagger-children grid grid-cols-2 gap-3">
-            {CHART_TOOLS.map(tool => (
+            {CHART_TOOLS.map(tool => tool.comingSoon ? (
+              <button key={tool.href}
+                onClick={() => setToast(`${tool.title}即将上线，敬请期待`)}
+                className="group rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--bg-base)',
+                  border: '1px solid var(--border-subtle)',
+                  boxShadow: 'var(--shadow-card)',
+                  opacity: 0.6,
+                }}>
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-xl transition-transform group-active:scale-95"
+                  style={{ background: tool.iconBg, color: tool.iconColor }}>
+                  {tool.icon}
+                </div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{tool.title}</p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>{tool.desc}</p>
+              </button>
+            ) : (
               <Link key={tool.href} href={tool.href}
                 className="group rounded-2xl p-4 transition-all active:scale-[0.98]"
                 style={{
@@ -117,6 +143,16 @@ export default function ToolsPage() {
           </div>
         </section>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed left-1/2 top-[15%] z-[999] -translate-x-1/2 animate-fadeIn">
+          <div className="rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg"
+            style={{ background: 'rgba(40,30,60,0.9)', backdropFilter: 'blur(8px)' }}>
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -147,23 +147,74 @@ export default function FortunePage() {
   }, [activeId]);
 
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // ── 日期导航 ──
+  const [selectedDate, setSelectedDate] = useState(today);
+  // weekOffset 控制日运的周翻页
+  const [weekOffset, setWeekOffset] = useState(0);
+  // 其他模式的偏移量
+  const [weeklyOffset, setWeeklyOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [yearOffset, setYearOffset] = useState(0);
+
+  const dayNames = ["一", "二", "三", "四", "五", "六", "日"];
+
+  // 日运：当前显示的周（基于 weekOffset）
+  const weekBase = new Date(today);
+  const todayDow = today.getDay() || 7; // 1=周一 ... 7=周日
+  weekBase.setDate(today.getDate() - todayDow + 1 + weekOffset * 7);
   const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now);
-    const dayOfWeek = now.getDay() || 7;
-    d.setDate(now.getDate() - dayOfWeek + 1 + i);
+    const d = new Date(weekBase);
+    d.setDate(weekBase.getDate() + i);
     return d;
   });
-  const [selectedDate, setSelectedDate] = useState(now);
-  const dayNames = ["一", "二", "三", "四", "五", "六", "日"];
-  const dateStr = selectedDate.toISOString().slice(0, 10);
 
-  // 切换运势类型
+  // 日运范围：前30天~后7天 → 约 -4 ~ +1 周
+  const canDailyPrev = weekOffset > -4;
+  const canDailyNext = weekOffset < 1;
+
+  // 周运：目标周的周一
+  const weeklyBase = new Date(today);
+  weeklyBase.setDate(today.getDate() - todayDow + 1 + weeklyOffset * 7);
+  const weeklyEnd = new Date(weeklyBase);
+  weeklyEnd.setDate(weeklyBase.getDate() + 6);
+  const canWeeklyPrev = weeklyOffset > -12;
+  const canWeeklyNext = weeklyOffset < 4;
+
+  // 月运：目标月份的第1天
+  const monthlyBase = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const canMonthlyPrev = monthOffset > -6;
+  const canMonthlyNext = monthOffset < 2;
+
+  // 年运：目标年份
+  const yearlyBase = today.getFullYear() + yearOffset;
+  const canYearlyPrev = yearOffset > -2;
+  const canYearlyNext = yearOffset < 1;
+
+  // 根据模式计算 dateStr（传给 API 的日期）
+  const dateStr = (() => {
+    if (period === 'daily') return selectedDate.toISOString().slice(0, 10);
+    if (period === 'weekly') return weeklyBase.toISOString().slice(0, 10);
+    if (period === 'monthly') return monthlyBase.toISOString().slice(0, 10);
+    if (period === 'yearly') return `${yearlyBase}-01-01`;
+    return today.toISOString().slice(0, 10);
+  })();
+
+  // 切换运势类型 — 重置偏移量
   const handlePeriodChange = useCallback((newPeriod: string) => {
     abortRef.current?.abort();
     setFortune(null);
     setInterpretations({});
     setInterpretDone(false);
     setPeriod(newPeriod);
+    // 重置日期到当前
+    setSelectedDate(new Date(today));
+    setWeekOffset(0);
+    setWeeklyOffset(0);
+    setMonthOffset(0);
+    setYearOffset(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchFortune = useCallback(async () => {
@@ -171,8 +222,16 @@ export default function FortunePage() {
     const pck = periodCacheKey(period, dateStr);
     const cacheKey = `fortune_${activePerson.id}_${period}_${pck}`;
     const cached = localStorage.getItem(cacheKey);
-    if (cached) { setFortune(JSON.parse(cached)); return; }
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      setFortune(parsed);
+      return;
+    }
 
+    setFortune(null);
+    setInterpretations({});
+    setInterpretDone(false);
+    abortRef.current?.abort();
     setLoading(true);
     try {
       const res = await fetch('/api/fortune', {
@@ -385,11 +444,17 @@ export default function FortunePage() {
     }
   }, [activeId, dateStr]);
 
+  // 周数计算辅助
+  const getWeekNum = (d: Date) => {
+    const jan1 = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+  };
+
   const dateLabel =
     period === "daily" ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`
-    : period === "weekly" ? `${now.getFullYear()}年第${Math.ceil(((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7)}周`
-    : period === "monthly" ? `${now.getFullYear()}年${now.getMonth() + 1}月`
-    : period === "yearly" ? `${now.getFullYear()}年`
+    : period === "weekly" ? `第${getWeekNum(weeklyBase)}周  ${weeklyBase.getMonth() + 1}/${weeklyBase.getDate()} - ${weeklyEnd.getMonth() + 1}/${weeklyEnd.getDate()}`
+    : period === "monthly" ? `${monthlyBase.getFullYear()}年${monthlyBase.getMonth() + 1}月`
+    : period === "yearly" ? `${yearlyBase}年`
     : '';
 
   if (!activePerson) {
@@ -463,49 +528,118 @@ export default function FortunePage() {
             ))}
           </div>
 
-          {/* Date selector (daily mode) */}
-          <AnimatePresence>
-            {period === "daily" && (
-              <motion.div
-                className="mb-5 flex gap-1.5"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25 }}
+          {/* ── 日期导航 ── */}
+          <div className="mb-4 space-y-2.5">
+            {/* 箭头导航行 */}
+            <div className="flex items-center gap-2">
+              <motion.button
+                onClick={() => {
+                  if (period === 'daily') { if (canDailyPrev) setWeekOffset(o => o - 1); }
+                  else if (period === 'weekly') { if (canWeeklyPrev) setWeeklyOffset(o => o - 1); }
+                  else if (period === 'monthly') { if (canMonthlyPrev) setMonthOffset(o => o - 1); }
+                  else if (period === 'yearly') { if (canYearlyPrev) setYearOffset(o => o - 1); }
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-tertiary)",
+                  opacity: (period === 'daily' ? canDailyPrev : period === 'weekly' ? canWeeklyPrev : period === 'monthly' ? canMonthlyPrev : canYearlyPrev) ? 1 : 0.3,
+                }}
+                whileTap={{ scale: 0.9 }}
               >
-                {weekDates.map((d, i) => {
-                  const isToday = d.toDateString() === now.toDateString();
-                  const isSelected = d.toDateString() === selectedDate.toDateString();
-                  return (
-                    <motion.button
-                      key={i}
-                      onClick={() => setSelectedDate(d)}
-                      className="flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5"
-                      style={{
-                        background: isSelected ? "var(--gradient-primary)" : "var(--bg-surface)",
-                        border: `1px solid ${isSelected ? "transparent" : "var(--border-subtle)"}`,
-                        boxShadow: isSelected ? "0 4px 12px rgba(123,108,184,0.20)" : "none",
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <span className="text-[0.6rem] font-medium" style={{ color: isSelected ? "rgba(255,255,255,0.7)" : "var(--text-tertiary)" }}>{dayNames[i]}</span>
-                      <span className="text-sm font-semibold" style={{ color: isSelected ? "white" : "var(--text-primary)" }}>{d.getDate()}</span>
-                      {isToday && !isSelected && <div className="h-1 w-1 rounded-full" style={{ background: "var(--accent-primary)" }} />}
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                ‹
+              </motion.button>
 
-          {/* Date label + chart type */}
-          <div className="mb-4 flex items-center gap-2">
-            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{dateLabel}</span>
-            {fortune?.chartType && (
-              <span className="rounded-full px-2 py-0.5 text-[0.55rem] font-medium" style={{ background: "var(--accent-primary-dim)", color: "var(--accent-primary)" }}>
-                {fortune.chartType === 'transit' ? '行运盘' : fortune.chartType === 'solar_return' ? '日返盘' : '月返盘'}
-              </span>
-            )}
+              <div className="flex flex-1 items-center justify-center gap-2">
+                <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{dateLabel}</span>
+                {fortune?.chartType && (
+                  <span className="rounded-full px-2 py-0.5 text-[0.55rem] font-medium" style={{ background: "var(--accent-primary-dim)", color: "var(--accent-primary)" }}>
+                    {fortune.chartType === 'transit' ? '行运盘' : fortune.chartType === 'solar_return' ? '日返盘' : '月返盘'}
+                  </span>
+                )}
+              </div>
+
+              <motion.button
+                onClick={() => {
+                  if (period === 'daily') { if (canDailyNext) setWeekOffset(o => o + 1); }
+                  else if (period === 'weekly') { if (canWeeklyNext) setWeeklyOffset(o => o + 1); }
+                  else if (period === 'monthly') { if (canMonthlyNext) setMonthOffset(o => o + 1); }
+                  else if (period === 'yearly') { if (canYearlyNext) setYearOffset(o => o + 1); }
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-tertiary)",
+                  opacity: (period === 'daily' ? canDailyNext : period === 'weekly' ? canWeeklyNext : period === 'monthly' ? canMonthlyNext : canYearlyNext) ? 1 : 0.3,
+                }}
+                whileTap={{ scale: 0.9 }}
+              >
+                ›
+              </motion.button>
+
+              {/* "回到今天"按钮 — 偏移不为0时显示 */}
+              {((period === 'daily' && weekOffset !== 0) ||
+                (period === 'weekly' && weeklyOffset !== 0) ||
+                (period === 'monthly' && monthOffset !== 0) ||
+                (period === 'yearly' && yearOffset !== 0)) && (
+                <motion.button
+                  onClick={() => {
+                    if (period === 'daily') { setWeekOffset(0); setSelectedDate(new Date(today)); }
+                    else if (period === 'weekly') setWeeklyOffset(0);
+                    else if (period === 'monthly') setMonthOffset(0);
+                    else if (period === 'yearly') setYearOffset(0);
+                  }}
+                  className="rounded-full px-2.5 py-1 text-[0.6rem] font-medium"
+                  style={{
+                    background: "var(--accent-primary-dim)",
+                    color: "var(--accent-primary)",
+                  }}
+                  whileTap={{ scale: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  今
+                </motion.button>
+              )}
+            </div>
+
+            {/* 日运：7天格子 */}
+            <AnimatePresence>
+              {period === "daily" && (
+                <motion.div
+                  className="flex gap-1.5"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  key={weekOffset}
+                >
+                  {weekDates.map((d, i) => {
+                    const isToday = d.toDateString() === today.toDateString();
+                    const isSelected = d.toDateString() === selectedDate.toDateString();
+                    return (
+                      <motion.button
+                        key={i}
+                        onClick={() => setSelectedDate(d)}
+                        className="flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5"
+                        style={{
+                          background: isSelected ? "var(--gradient-primary)" : "var(--bg-surface)",
+                          border: `1px solid ${isSelected ? "transparent" : "var(--border-subtle)"}`,
+                          boxShadow: isSelected ? "0 4px 12px rgba(123,108,184,0.20)" : "none",
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <span className="text-[0.6rem] font-medium" style={{ color: isSelected ? "rgba(255,255,255,0.7)" : "var(--text-tertiary)" }}>{dayNames[i]}</span>
+                        <span className="text-sm font-semibold" style={{ color: isSelected ? "white" : "var(--text-primary)" }}>{d.getDate()}</span>
+                        {isToday && !isSelected && <div className="h-1 w-1 rounded-full" style={{ background: "var(--accent-primary)" }} />}
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Loading */}

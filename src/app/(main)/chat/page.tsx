@@ -38,6 +38,8 @@ function detectChartType(question: string): ChartType {
   if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返/.test(q)) return 'lunar_return';
   // 年运 / 今年 / 明年 / 2025年 / 流年 → 日返盘
   if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'solar_return';
+  // 时机类问题 → 行运盘（"什么时候出现"、"何时"、"几岁"等）
+  if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|会不会出现|啥时候|几时/.test(q)) return 'transit';
   // 行运 / 最近运势 / 近期 / 当前 / 这段时间 → 行运盘
   if (/行运|最近|近期|当前|目前|这段时间|现在|眼下|运势|未来/.test(q)) return 'transit';
   // 默认本命盘
@@ -333,22 +335,28 @@ function ChatContent() {
       const last = updated[updated.length - 1];
       if (last?.role === 'assistant' && last.content) {
         const patterns = [
+          // 代码块包裹的推荐追问
           /```\s*\n?\[推荐[追问题]+\]\s*\n([\s\S]*?)```/,
-          /\[推荐[追问题]+\]\s*\n((?:\d+[.、]\s*.+\n?){1,3})/,
-          /\*?\*?推荐[追问题]+\*?\*?[:：]\s*\n((?:\d+[.、]\s*.+\n?){1,3})/,
+          // 标准格式：[推荐追问] 后跟编号列表（匹配到文末）
+          /\[推荐[追问题]+\]\s*\n([\s\S]*?)$/,
+          // 带星号或冒号的变体
+          /\*?\*?推荐[追问题]+\*?\*?[:：]\s*\n([\s\S]*?)$/,
+          // 没有方括号，直接 "推荐追问" 文字
+          /推荐追问\s*[:：]?\s*\n([\s\S]*?)$/,
         ];
         for (const pattern of patterns) {
           const match = last.content.match(pattern);
           if (match) {
             const questions = match[1].trim().split('\n')
-              .map(q => q.replace(/^\d+[.、]\s*/, '').trim())
-              .filter(Boolean).slice(0, 3);
+              .map(q => q.replace(/^\d+[.、)\-]\s*/, '').replace(/^\*+\s*/, '').trim())
+              .filter(q => q.length > 0 && q.length < 100)
+              .slice(0, 3);
             if (questions.length > 0) {
               setSuggestions(questions);
               if (profileIdRef.current) {
                 try { localStorage.setItem(suggestionsStorageKey(profileIdRef.current), JSON.stringify(questions)); } catch { /* ignore */ }
               }
-              last.content = last.content.replace(pattern, '').trimEnd();
+              last.content = last.content.slice(0, match.index).trimEnd();
               break;
             }
           }
@@ -676,13 +684,24 @@ function ChatContent() {
             if (cardSections && cardSections.length > 0) {
               const data = getChartData();
               const ct = msg.chartType || 'natal';
+
+              // Dedup: find previous assistant message's chartType — hide chart panel if same
+              let prevAssistantChartType: ChartType | null = null;
+              for (let j = i - 1; j >= 0; j--) {
+                if (messages[j].role === 'assistant' && messages[j].chartType) {
+                  prevAssistantChartType = messages[j].chartType!;
+                  break;
+                }
+              }
+              const showChartPanel = ct !== prevAssistantChartType;
+
               // Pick the chart matching the detected type
-              const displayChart: AstrologyChart | undefined = (() => {
+              const displayChart: AstrologyChart | undefined = showChartPanel ? (() => {
                 if (ct === 'solar_return') return (data?.solarReturn as Record<string, unknown>)?.chart as AstrologyChart | undefined;
                 if (ct === 'lunar_return') return (data?.lunarReturn as Record<string, unknown>)?.chart as AstrologyChart | undefined;
                 if (ct === 'transit') return (data?.transitChart as AstrologyChart | undefined) || (data?.natalChart as AstrologyChart | undefined);
                 return data?.natalChart as AstrologyChart | undefined;
-              })();
+              })() : undefined;
               const displayPlanets = displayChart?.planets;
               const chartLabel = CHART_TYPE_LABELS[ct];
 

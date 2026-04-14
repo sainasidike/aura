@@ -87,6 +87,7 @@ function ChatContent() {
   const touchMoved = useRef(false);
 
   const chatStorageKey = (id: string) => `aura_chat_${id}`;
+  const suggestionsStorageKey = (id: string) => `aura_chat_suggestions_${id}`;
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -158,7 +159,10 @@ function ChatContent() {
       const saved = localStorage.getItem(chatStorageKey(profileIdRef.current));
       setMessages(saved ? JSON.parse(saved) : []);
     } catch { setMessages([]); }
-    setSuggestions([]);
+    try {
+      const savedSugg = localStorage.getItem(suggestionsStorageKey(profileIdRef.current));
+      setSuggestions(savedSugg ? JSON.parse(savedSugg) : []);
+    } catch { setSuggestions([]); }
     exitSelectMode();
   }, [profile, astroContext]);
 
@@ -315,6 +319,9 @@ function ChatContent() {
               .filter(Boolean).slice(0, 3);
             if (questions.length > 0) {
               setSuggestions(questions);
+              if (profileIdRef.current) {
+                try { localStorage.setItem(suggestionsStorageKey(profileIdRef.current), JSON.stringify(questions)); } catch { /* ignore */ }
+              }
               last.content = last.content.replace(pattern, '').trimEnd();
               break;
             }
@@ -385,6 +392,39 @@ function ChatContent() {
     exitSelectMode();
     setShowConfirm(false);
     showToast('对话已清除');
+  };
+
+  // ─── Message actions (copy / regenerate / share) ───
+  const handleCopySingle = (content: string) => {
+    navigator.clipboard.writeText(content);
+    showToast('已复制到剪贴板');
+  };
+
+  const handleRegenerate = (msgIndex: number) => {
+    if (streaming) return;
+    // Find the user message before this assistant message
+    let userMsgIndex = -1;
+    for (let j = msgIndex - 1; j >= 0; j--) {
+      if (messages[j].role === 'user') { userMsgIndex = j; break; }
+    }
+    if (userMsgIndex < 0) return;
+    const userContent = messages[userMsgIndex].content;
+    // Remove only the assistant response, keep the user message
+    // sendMessage will add a new user message, so remove both and re-send
+    setMessages(prev => prev.slice(0, userMsgIndex));
+    setSuggestions([]);
+    setTimeout(() => sendMessage(userContent), 50);
+  };
+
+  const handleShareSingle = (msgIndex: number) => {
+    // Enter select mode with this message and its preceding user message pre-selected
+    const sel = new Set<number>([msgIndex]);
+    for (let j = msgIndex - 1; j >= 0; j--) {
+      if (messages[j].role === 'user') { sel.add(j); break; }
+    }
+    setSelectMode(true);
+    setSelected(sel);
+    setShowShare(true);
   };
 
   // ─── Share helpers ───
@@ -619,7 +659,7 @@ function ChatContent() {
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                   onClick={selectMode ? () => toggleSelect(i) : undefined}
-                  onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
+                  onContextMenu={undefined}
                 >
                   {/* Selection checkbox for card messages */}
                   {selectMode && (
@@ -775,6 +815,24 @@ function ChatContent() {
                       })}
                     </div>
                   </div>
+
+                  {/* Action buttons for card layout */}
+                  {!streaming && !selectMode && msg.content && (
+                    <div className="mt-2 flex items-center justify-center gap-6">
+                      <button onClick={() => handleCopySingle(msg.content)} className="flex items-center gap-1.5 py-1.5 text-xs transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        复制
+                      </button>
+                      <button onClick={() => handleRegenerate(i)} className="flex items-center gap-1.5 py-1.5 text-xs transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                        重新生成
+                      </button>
+                      <button onClick={() => handleShareSingle(i)} className="flex items-center gap-1.5 py-1.5 text-xs transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                        分享
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -789,7 +847,7 @@ function ChatContent() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onClick={selectMode ? () => toggleSelect(i) : undefined}
-                onContextMenu={selectMode ? undefined : (e) => { e.preventDefault(); }}
+                onContextMenu={undefined}
               >
                 {/* Selection checkbox */}
                 {selectMode && (
@@ -858,6 +916,21 @@ function ChatContent() {
                     <div className="whitespace-pre-wrap">{msg.content || '...'}</div>
                   )}
                 </div>
+
+                {/* Action buttons for bubble layout (assistant only) */}
+                {msg.role === 'assistant' && !streaming && !selectMode && msg.content && (
+                  <div className="mt-1 flex items-center gap-5 pl-10">
+                    <button onClick={() => handleCopySingle(msg.content)} className="flex items-center gap-1 py-1 text-[11px] transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    </button>
+                    <button onClick={() => handleRegenerate(i)} className="flex items-center gap-1 py-1 text-[11px] transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    </button>
+                    <button onClick={() => handleShareSingle(i)} className="flex items-center gap-1 py-1 text-[11px] transition-opacity hover:opacity-70" style={{ color: 'var(--text-tertiary)' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

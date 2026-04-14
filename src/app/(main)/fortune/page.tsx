@@ -765,7 +765,7 @@ export default function FortunePage() {
               </motion.div>
 
               {/* Category detail cards */}
-              {CATEGORIES.map((cat, idx) => {
+              {(() => { const _seenAsp = new Set<string>(); return CATEGORIES.map((cat, idx) => {
                 const data = fortune.categories[cat.key];
                 if (!data) return null;
                 const interp = interpretations[cat.key] || "";
@@ -805,7 +805,7 @@ export default function FortunePage() {
                           {fortune.chartType === 'solar_return' ? '日返盘相位' : fortune.chartType === 'lunar_return' ? '月返盘相位' : '行运相位影响'}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {data.aspects.filter((asp, i, arr) => arr.findIndex(a => a.transit === asp.transit && a.natal === asp.natal && a.type === asp.type) === i).map((asp, i) => {
+                          {data.aspects.filter(asp => { const k = `${asp.transit}|${asp.natal}|${asp.type}`; if (_seenAsp.has(k)) return false; _seenAsp.add(k); return true; }).map((asp, i) => {
                             const ns = NATURE_STYLE[asp.nature] || { bg: "rgba(128,128,128,0.08)", text: "#888" };
                             return (
                               <button key={i}
@@ -841,7 +841,7 @@ export default function FortunePage() {
                     </div>
                   </motion.div>
                 );
-              })}
+              }); })()}
 
               {interpretDone && (
                 <motion.p className="text-center text-[0.65rem] py-3" style={{ color: "var(--text-tertiary)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>

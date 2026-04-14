@@ -19,20 +19,34 @@ export async function* streamChat(
   messages: ZhipuMessage[],
   apiKey: string,
 ): AsyncGenerator<string> {
-  const response = await fetch(ZHIPU_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'glm-4-flash',
-      messages,
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 2048,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  let response: Response;
+  try {
+    response = await fetch(ZHIPU_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'glm-4-flash',
+        messages,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    clearTimeout(timeout);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('AI 服务请求超时，请稍后重试');
+    }
+    throw new Error(`AI 服务连接失败: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const error = await response.text();

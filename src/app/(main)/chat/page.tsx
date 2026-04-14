@@ -240,6 +240,9 @@ function ChatContent() {
           if (data === '[DONE]') continue;
           try {
             const parsed = JSON.parse(data);
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
             if (parsed.content) {
               setMessages(prev => {
                 const updated = [...prev];
@@ -248,15 +251,20 @@ function ChatContent() {
                 return updated;
               });
             }
-          } catch { /* skip */ }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Unexpected end of JSON input') throw e;
+          }
         }
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : '回复失败';
       setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
-        if (last.role === 'assistant' && !last.content) {
-          last.content = '抱歉，回复失败。请检查 ZHIPU_API_KEY 是否已配置。';
+        if (last.role === 'assistant') {
+          if (!last.content) {
+            last.content = `抱歉，${errMsg}`;
+          }
         }
         return updated;
       });

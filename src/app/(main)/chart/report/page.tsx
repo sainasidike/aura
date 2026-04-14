@@ -8,6 +8,7 @@ import { fetchNatalCharts } from '@/lib/chart-cache';
 import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
 import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ShareModal from '@/components/ui/ShareModal';
+import { simpleMarkdown } from '@/lib/simple-markdown';
 
 const REPORT_META: Record<string, { title: string; icon: string; color: string }> = {
   love: { title: '正缘报告', icon: '♡', color: '#d07090' },
@@ -614,20 +615,4 @@ function ReportContent() {
       `}</style>
     </div>
   );
-}
-
-/** Minimal markdown to HTML */
-function simpleMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^\- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
-    .replace(/^/, '<p>').replace(/$/, '</p>');
 }

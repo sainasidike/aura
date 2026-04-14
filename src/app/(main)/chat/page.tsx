@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
 import { getProfileById, getProfiles, type StoredProfile } from '@/lib/storage';
 import { fetchNatalCharts } from '@/lib/chart-cache';
 import { generateChatImage, downloadBlob } from '@/lib/chat-image';
+import { annotateGlossaryTerms, getGlossaryEntry, type GlossaryEntry } from '@/lib/astrology-glossary';
+import { simpleMarkdown } from '@/lib/simple-markdown';
+import { annotateDataRefs } from '@/lib/annotate-data-refs';
+import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ShareModal from '@/components/ui/ShareModal';
 
@@ -63,6 +66,10 @@ function ChatContent() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
+  // Glossary
+  const [glossaryEntry, setGlossaryEntry] = useState<GlossaryEntry | null>(null);
+  const [glossaryRect, setGlossaryRect] = useState<DOMRect | null>(null);
+
   // Modals
   const [showConfirm, setShowConfirm] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -78,6 +85,19 @@ function ChatContent() {
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2000);
+  }, []);
+
+  // Glossary click delegation
+  const handleGlossaryClick = useCallback((e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest('.glossary-term') as HTMLElement | null;
+    if (!target) return;
+    const term = target.getAttribute('data-term');
+    if (!term) return;
+    const entry = getGlossaryEntry(term);
+    if (entry) {
+      setGlossaryEntry(entry);
+      setGlossaryRect(target.getBoundingClientRect());
+    }
   }, []);
 
   // ─── Profile loading ───
@@ -497,14 +517,60 @@ function ChatContent() {
                 <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                   {allChartData ? '你好，我是你的 AI 占星师' : '正在准备排盘数据...'}
                 </p>
-                {allChartData && (
-                  <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    基于你的完整星盘数据，试试以下问题
-                  </p>
-                )}
+                {allChartData && (() => {
+                  const natal = allChartData.natalChart as { planets?: { name: string; sign: string; degree: number; minute?: number }[]; houses?: unknown[]; aspects?: unknown[]; ascendant?: number } | undefined;
+                  const bazi = allChartData.bazi as { fourPillars?: { year: { ganZhi: string }; month: { ganZhi: string }; day: { ganZhi: string }; time: { ganZhi: string } } } | undefined;
+                  const ziwei = allChartData.ziwei as { destinyMaster?: string } | undefined;
+
+                  const sun = natal?.planets?.find(p => p.name === '太阳');
+                  const moon = natal?.planets?.find(p => p.name === '月亮');
+                  const SIGNS = ['白羊', '金牛', '双子', '巨蟹', '狮子', '处女', '天秤', '天蝎', '射手', '摩羯', '水瓶', '双鱼'];
+                  const ascDeg = natal?.ascendant;
+                  const ascSign = ascDeg != null ? SIGNS[Math.floor(((ascDeg % 360 + 360) % 360) / 30)] : null;
+
+                  const planetCount = natal?.planets?.length || 0;
+                  const houseCount = natal?.houses?.length || 0;
+                  const aspectCount = natal?.aspects?.length || 0;
+                  const fp = bazi?.fourPillars;
+
+                  const hasSummary = sun || moon || ascSign || fp || ziwei?.destinyMaster;
+
+                  return hasSummary ? (
+                    <div className="mt-3 w-full max-w-xs rounded-xl px-4 py-3 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                      <p className="mb-1.5 text-[11px] font-medium tracking-wide" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>已加载排盘数据</p>
+                      {(sun || moon || ascSign) && (
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          {sun && <span>☉ {sun.sign}{sun.degree}°{sun.minute != null ? String(sun.minute).padStart(2, '0') + "'" : ''}</span>}
+                          {sun && moon && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
+                          {moon && <span>☽ {moon.sign}{moon.degree}°{moon.minute != null ? String(moon.minute).padStart(2, '0') + "'" : ''}</span>}
+                          {(sun || moon) && ascSign && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
+                          {ascSign && <span>↑ {ascSign}座</span>}
+                        </p>
+                      )}
+                      {planetCount > 0 && (
+                        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                          {planetCount} 颗行星 · {houseCount} 宫位 · {aspectCount} 个相位
+                        </p>
+                      )}
+                      {(fp || ziwei?.destinyMaster) && (
+                        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                          {fp && <span>八字：{fp.year.ganZhi} {fp.month.ganZhi} {fp.day.ganZhi} {fp.time.ganZhi}</span>}
+                          {fp && ziwei?.destinyMaster && ' | '}
+                          {ziwei?.destinyMaster && <span>紫微命主：{ziwei.destinyMaster}</span>}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      基于你的完整星盘数据，试试以下问题
+                    </p>
+                  );
+                })()}
               </div>
               {allChartData && (
-                <div className="stagger-children flex flex-wrap justify-center gap-2">
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>试试以下问题</p>
+                  <div className="stagger-children flex flex-wrap justify-center gap-2">
                   {COLD_START_QUESTIONS.map((q, i) => (
                     <button
                       key={i}
@@ -530,6 +596,7 @@ function ChatContent() {
                       {q}
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -598,7 +665,12 @@ function ChatContent() {
               >
                 <div className={msg.role === 'assistant' ? 'prose-chat' : 'whitespace-pre-wrap'}>
                   {msg.role === 'assistant' ? (
-                    msg.content ? <ReactMarkdown>{msg.content}</ReactMarkdown> : (
+                    msg.content ? (
+                      <div
+                        onClick={handleGlossaryClick}
+                        dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(msg.content)), getChartData()) }}
+                      />
+                    ) : (
                       <div className="flex items-center gap-1.5">
                         <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)' }} />
                         <span className="inline-block h-1.5 w-1.5 rounded-full animate-breathe" style={{ background: 'var(--accent-primary)', animationDelay: '0.3s' }} />
@@ -729,6 +801,13 @@ function ChatContent() {
         onSaveImage={handleSaveImage}
       />
 
+      {/* Glossary Popup */}
+      <GlossaryPopup
+        entry={glossaryEntry}
+        anchorRect={glossaryRect}
+        onClose={() => { setGlossaryEntry(null); setGlossaryRect(null); }}
+      />
+
       {/* Toast */}
       {toast && (
         <div
@@ -738,6 +817,29 @@ function ChatContent() {
           {toast}
         </div>
       )}
+
+      {/* Glossary term + data badge inline styles */}
+      <style jsx global>{`
+        .glossary-term {
+          color: var(--accent-primary);
+          text-decoration: underline;
+          text-decoration-style: dotted;
+          text-underline-offset: 3px;
+          text-decoration-thickness: 1px;
+          cursor: pointer;
+          transition: opacity 0.15s;
+        }
+        .glossary-term:hover { opacity: 0.75; }
+        .data-badge {
+          display: inline-block;
+          margin-left: 2px;
+          font-size: 10px;
+          color: #40a080;
+          vertical-align: super;
+          font-weight: 600;
+          opacity: 0.85;
+        }
+      `}</style>
     </div>
   );
 }

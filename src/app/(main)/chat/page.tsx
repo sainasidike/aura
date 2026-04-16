@@ -35,7 +35,7 @@ interface Message {
 /** 根据用户提问内容自动推断应使用的星盘类型 */
 function detectChartType(question: string): ChartType {
   const q = question.toLowerCase();
-  if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返/.test(q)) return 'lunar_return';
+  if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返|\d{1,2}月份?的?运/.test(q)) return 'lunar_return';
   if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'solar_return';
   if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|会不会出现|啥时候|几时/.test(q)) return 'transit';
   if (/行运|最近|近期|当前|目前|这段时间|现在|眼下|运势|未来/.test(q)) return 'transit';
@@ -46,7 +46,7 @@ function detectChartType(question: string): ChartType {
 function detectIntent(question: string): QuestionIntent {
   const q = question;
   // 月运类
-  if (/月运|本月|这个月|这月|当月|月度|月返/.test(q)) return 'monthly';
+  if (/月运|本月|这个月|这月|当月|月度|月返|\d{1,2}月份?的?运/.test(q)) return 'monthly';
   // 年运类
   if (/年运|今年|明年|后年|流年|本年|年度|\d{4}年|日返/.test(q)) return 'yearly';
   // 感情/正缘类（优先级高于事业，因为"适合在一起"也是感情问题）
@@ -59,6 +59,8 @@ function detectIntent(question: string): QuestionIntent {
   if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|啥时候|几时/.test(q)) return 'timing';
   // 性格分析类
   if (/性格|优缺点|什么样的人|人格|脾气|个性|天赋|特质|潜力|擅长/.test(q)) return 'personality';
+  // 泛运势类（没匹配到具体领域，但提到了运势/最近/近期）
+  if (/运势|最近|近期|目前|当前|这段时间|未来/.test(q)) return 'timing';
   // 默认全盘解读
   return 'general';
 }

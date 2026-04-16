@@ -3,6 +3,7 @@ import { standardizeTime } from '@/lib/time/solar-time';
 import { calculateBazi } from '@/lib/engines/bazi';
 import { calculateAstrology, findSolarReturn, findLunarReturn, calculateCrossAspects } from '@/lib/engines/astrology';
 import { streamChat, type ZhipuMessage } from '@/lib/ai/zhipu';
+import { extractDailyInsights } from '@/lib/ai/daily-insights';
 
 const SIGNS = ['白羊', '金牛', '双子', '巨蟹', '狮子', '处女', '天秤', '天蝎', '射手', '摩羯', '水瓶', '双鱼'];
 function lonToSignStr(lon: number): string {
@@ -155,9 +156,49 @@ ${fmtAspects(crossAspects, 15)}`;
 周运要区分上半周和下半周的节奏差异，侧重慢行星的持续影响叠加快行星的触发节点。`;
 
       } else {
-        analysisPrompt = `分析行运盘写日运。每段首句引用具体行运相位（容许度越小越优先）。
-爱情→行运金星/月亮与本命金星/月亮/7宫/5宫 事业→行运太阳/土星/木星与本命太阳/MC/10宫 健康→行运火星与ASC/6宫+月亮过境 学习→行运水星与本命水星/3宫/9宫 人际→行运木星/金星与11宫
-日运要具体到场景和建议。`;
+        // 日运预分析：提取今日关键天象
+        let dailyInsightsBlock = '';
+        try {
+          dailyInsightsBlock = extractDailyInsights(
+            transitChart.planets,
+            natalChart.planets,
+            crossAspects,
+            natalChart.ascendant,
+          );
+        } catch { /* 静默降级 */ }
+
+        analysisPrompt = `基于行运盘分析今日运势。
+
+## 分析框架
+1. **行运月亮过宫**（日运差异化的关键）→ 今天月亮在你的第几宫，决定今天情绪重心和最在意的事
+2. **紧密行运相位（orb<2°）** → 今天最活跃的能量，直接影响具体事件
+3. **行运内行星（水金火）位置** → 今天沟通/感情/行动力的状态
+4. **行运外行星的持续相位** → 最近一段时间的背景能量
+
+每个维度关注：
+- 爱情：行运月亮/金星与本命金星/月亮/7宫/5宫的相位，今天感情方面具体会发生什么
+- 事业：行运太阳/火星/土星与本命太阳/MC/10宫的相位，今天工作中会遇到什么
+- 健康：行运火星位置+月亮过境对身体的影响，今天精力状态和需要注意的身体部位
+- 学习：行运水星与本命水星/3宫/9宫的相位，今天大脑是清醒还是迟钝，适合做什么
+- 人际：行运木星/金星与11宫/7宫的相位，今天社交场合会怎样
+
+${dailyInsightsBlock}
+
+## 解读标准（极重要）
+日运必须回答"今天具体会发生什么"，而不是"你可能会有变化"。
+
+禁止的废话（出现即不合格）：
+- ❌ "今天可能会有一些变化/挑战/机会"
+- ❌ "保持积极/开放/灵活的心态"
+- ❌ "注意劳逸结合"
+- ❌ "可能会感到一些压力"
+
+合格的日运长这样：
+- 爱情✅："今天下午容易因为一句无心的话和伴侣闹别扭，尤其是关于花钱或者计划安排的分歧。先别急着解释，给对方十分钟冷静"
+- 事业✅："上午脑子最清醒，把需要动脑的工作安排在午饭前。下午3点后容易走神，适合做不需要太多创造力的机械性工作"
+- 健康✅："今天火星能量强，适合做高强度运动（跑步、HIIT），但注意肩颈——低头看手机超过30分钟就起来活动一下"
+- 学习✅："水星状态好，背单词、看专业书的效率比平时高。但别同时开两本书，今天适合专注深入一个主题"
+- 人际✅："今天有贵人运，如果接到陌生电话或收到老朋友的消息，别忽略——可能带来有用的信息或机会"`;
       }
     }
 

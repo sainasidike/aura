@@ -317,12 +317,152 @@ function buildInsightBlock(chartData: Record<string, unknown>, questionIntent?: 
 /**
  * 构建命理分析的系统 prompt
  */
+/** 当用户同时指定了时间范围和具体主题时，生成聚焦指令追加到周期模板中 */
+function buildTopicFocus(topic: string, period: 'monthly' | 'yearly'): string {
+  const periodLabel = period === 'monthly' ? '本月' : '今年';
+  const TOPIC_FOCUS: Record<string, { label: string; focus: string; cards: string }> = {
+    love: {
+      label: '感情',
+      focus: `用户重点关注**${periodLabel}感情运**。请将感情维度作为核心深入展开（占总篇幅60%以上），其他维度简略带过。
+分析框架在感情方面要重点关注：
+- 金星落宫+星座+相位 → ${periodLabel}恋爱风格和吸引力
+- 7宫宫头+宫内行星 → 伴侣互动模式
+- 月亮落宫 → 情感需求和情绪节奏
+- 5宫行星 → 恋爱/桃花机会
+- 与本命金星/月亮的交叉相位 → 感情事件触发点`,
+      cards: period === 'monthly'
+        ? `---VENUS--- ${periodLabel}感情基调与恋爱风格\n---LOVE--- 桃花机会与伴侣互动\n---MOON--- 情感需求与情绪节奏\n---SUMMARY--- ${periodLabel}感情综合建议`
+        : `---VENUS--- ${periodLabel}感情基调与恋爱风格\n---LOVE--- 桃花时机与伴侣关系\n---MOON--- 情感深层需求\n---SUMMARY--- ${periodLabel}感情综合建议`,
+    },
+    career: {
+      label: '事业',
+      focus: `用户重点关注**${periodLabel}事业运**。请将事业维度作为核心深入展开（占总篇幅60%以上），其他维度简略带过。
+分析框架在事业方面要重点关注：
+- MC星座+10宫行星 → ${periodLabel}事业方向和能量
+- 太阳落宫 → 精力聚焦方向
+- 土星位置+相位 → 压力与责任来源
+- 木星位置+相位 → 机遇和扩张方向
+- 6宫行星 → 日常工作状态`,
+      cards: period === 'monthly'
+        ? `---CAREER--- ${periodLabel}事业方向与能量\n---SATURN--- 压力与挑战\n---JUPITER--- 机遇与突破\n---SUMMARY--- ${periodLabel}事业综合建议`
+        : `---CAREER--- ${periodLabel}事业方向与能量\n---SATURN--- 核心挑战与修炼\n---JUPITER--- 机遇窗口期\n---SUMMARY--- ${periodLabel}事业综合建议`,
+    },
+    health: {
+      label: '健康',
+      focus: `用户重点关注**${periodLabel}健康运**。请将健康维度作为核心深入展开（占总篇幅60%以上），其他维度简略带过。
+分析框架在健康方面要重点关注：
+- ASC星座 → 身体整体状态
+- 6宫行星 → 日常健康模式
+- 火星位置+相位 → 精力水平和运动建议
+- 月亮位置 → 情绪健康和睡眠
+- 12宫行星 → 隐性健康问题`,
+      cards: period === 'monthly'
+        ? `---HEALTH--- ${periodLabel}身体状态\n---MARS--- 精力与运动\n---MOON--- 情绪与睡眠\n---SUMMARY--- ${periodLabel}健康综合建议`
+        : `---HEALTH--- ${periodLabel}体质与健康趋势\n---MARS--- 精力管理\n---MOON--- 情绪健康\n---SUMMARY--- ${periodLabel}健康综合建议`,
+    },
+  };
+  return TOPIC_FOCUS[topic] ? JSON.stringify(TOPIC_FOCUS[topic]) : '';
+}
+
 export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: string, analysisType?: string, questionIntent?: string): string {
   const intent = questionIntent || 'general';
   const insightBlock = buildInsightBlock(chartData, intent);
   const data = compressAstrologyOnly(chartData);
 
-  // ─── 感情/正缘专项 ───
+  // ═══ 组合路由：有周期盘（月返/日返）+ 有具体主题 → 周期盘 + 主题聚焦 ═══
+  const isTopicSpecific = ['love', 'career', 'health'].includes(intent);
+  const isPeriodChart = analysisType === 'lunar_return' || analysisType === 'solar_return';
+
+  if (isPeriodChart && isTopicSpecific) {
+    const period: 'monthly' | 'yearly' = analysisType === 'lunar_return' ? 'monthly' : 'yearly';
+    const periodLabel = period === 'monthly' ? '本月' : '今年';
+    const chartLabel = period === 'monthly' ? '月返盘（月亮回归盘）' : '日返盘（太阳回归盘）';
+    const focusRaw = buildTopicFocus(intent, period);
+    const focus = focusRaw ? JSON.parse(focusRaw) as { label: string; focus: string; cards: string } : null;
+
+    if (focus) {
+      return `你是专业西洋占星师，正在使用**${chartLabel}**分析${periodLabel}运势，用户重点关注**${focus.label}**。只使用西洋占星学体系。
+
+## 主题聚焦
+${focus.focus}
+
+## 分析框架（${period === 'monthly' ? '月返盘' : '日返盘'}基础框架）
+${period === 'monthly' ? `1. **月返ASC星座** → 本月生活基调和外在状态
+2. **月返月亮落宫** → 本月最牵动情绪的具体事项
+3. **月返太阳宫位** → 本月精力主要投入的生活领域
+4. **紧密相位（orb<3°）** → 本月具体发生什么事
+5. **月返火星宫位** → 本月容易发生冲突或需要行动力的领域` : `1. **日返ASC星座** → 今年的整体氛围和生活基调
+2. **日返太阳落宫** → 今年核心能量集中的领域
+3. **日返月亮星座+宫位** → 今年的情感主题和内心需求
+4. **日返MC + 10宫行星** → 今年事业方向
+5. **日返盘中的紧密相位** → 年度关键事件的触发点
+6. **角宫（1/4/7/10宫）有无行星** → 今年哪些领域最活跃`}
+📊数据部分请优先引用【${period === 'monthly' ? '月返盘' : '日返盘'}】的数据。
+
+## 解读要求（极重要）
+你必须把星盘语言翻译成具体的日常生活场景，聚焦${focus.label}领域。
+每段解读都要回答"${periodLabel}${focus.label}方面具体会发生什么"，而不是"可能有变化"。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(focus.cards)}
+
+${COMMON_RULES}`;
+    }
+  }
+
+  // ═══ 行运盘 + 具体主题 → 行运盘 + 主题聚焦 ═══
+  if (analysisType === 'transit' && isTopicSpecific) {
+    const TRANSIT_TOPIC: Record<string, { label: string; focus: string; cards: string }> = {
+      love: {
+        label: '感情',
+        focus: `用户重点关注**近期感情运**。请将感情维度作为核心深入展开（占总篇幅60%以上）。
+重点关注：行运金星/月亮与本命金星/月亮/7宫/5宫的交叉相位，行运火星对本命金星的相位。`,
+        cards: `---VENUS--- 近期感情基调\n---LOVE--- 桃花机会与关系互动\n---MOON--- 情感需求与情绪节奏\n---SUMMARY--- 近期感情综合建议`,
+      },
+      career: {
+        label: '事业',
+        focus: `用户重点关注**近期事业运**。请将事业维度作为核心深入展开（占总篇幅60%以上）。
+重点关注：行运土星/木星与本命MC/10宫的交叉相位，行运太阳落宫，行运水星位置。`,
+        cards: `---CAREER--- 近期事业方向\n---SATURN--- 压力与挑战\n---JUPITER--- 机遇与突破\n---SUMMARY--- 近期事业综合建议`,
+      },
+      health: {
+        label: '健康',
+        focus: `用户重点关注**近期健康运**。请将健康维度作为核心深入展开（占总篇幅60%以上）。
+重点关注：行运火星位置+相位，行运土星与本命ASC/6宫的相位，行运月亮过境。`,
+        cards: `---HEALTH--- 近期身体状态\n---MARS--- 精力与运动\n---MOON--- 情绪与睡眠\n---SUMMARY--- 近期健康综合建议`,
+      },
+    };
+    const tf = TRANSIT_TOPIC[intent];
+    if (tf) {
+      return `你是专业西洋占星师，正在使用**行运盘（Transit Chart）**分析近期运势，用户重点关注**${tf.label}**。只使用西洋占星学体系。
+
+## 主题聚焦
+${tf.focus}
+
+## 分析框架
+1. **识别与${tf.label}相关的本命宫位和行星**
+2. **找出行运行星与这些本命位置的交叉相位** → 当下最活跃的能量
+3. **行运月亮过宫** → 近几天的情绪节奏
+4. **行运内行星（水金火）位置** → 短期具体影响
+5. **行运外行星的持续相位** → 近期背景能量
+📊数据部分请优先引用【行运盘】和【行运×本命相位】的数据。
+
+## 解读要求（极重要）
+你必须把星盘语言翻译成具体的日常生活场景，聚焦${tf.label}领域。
+每段解读都要回答"近期${tf.label}方面具体会发生什么"，而不是"可能有变化"。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(tf.cards)}
+
+${COMMON_RULES}`;
+    }
+  }
+
+  // ─── 感情/正缘专项（本命盘）───
   if (intent === 'love') {
     return `你是专业西洋占星师，用户正在咨询**感情与正缘**。只使用西洋占星学体系。
 

@@ -17,6 +17,8 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 
 type ChartType = 'natal' | 'transit' | 'solar_return' | 'lunar_return';
 export type QuestionIntent = 'general' | 'personality' | 'love' | 'career' | 'timing' | 'yearly' | 'monthly' | 'health';
+type TimeScope = 'monthly' | 'yearly' | 'transit' | 'none';
+type Topic = 'love' | 'career' | 'health' | 'personality' | 'timing' | 'general';
 
 /** 渲染前移除消息末尾的推荐追问文本（避免与按钮重复） */
 function stripSuggestions(content: string): string {
@@ -42,36 +44,57 @@ interface Message {
   chartType?: ChartType;
 }
 
-/** 根据用户提问内容自动推断应使用的星盘类型 */
-function detectChartType(question: string): ChartType {
-  const q = question.toLowerCase();
-  if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返|\d{1,2}月份?的?运/.test(q)) return 'lunar_return';
-  if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'solar_return';
+/** 第一层：检测时间范围 — 决定用哪个盘 */
+function detectTimeScope(question: string): TimeScope {
+  const q = question;
+  // 月运：支持 "X月运" "X月份运势" "X月的感情运" 等含月份的表达
+  if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返/.test(q)) return 'monthly';
+  if (/\d{1,2}月/.test(q) && /运|运势/.test(q)) return 'monthly';
+  // 年运
+  if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'yearly';
+  // 行运：近期/最近/目前/运势等泛时间表达
   if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|会不会出现|啥时候|几时/.test(q)) return 'transit';
   if (/行运|最近|近期|当前|目前|这段时间|现在|眼下|运势|未来/.test(q)) return 'transit';
+  return 'none';
+}
+
+/** 第二层：检测分析主题 — 决定聚焦哪个维度 */
+function detectTopic(question: string): Topic {
+  const q = question;
+  if (/正缘|感情|恋爱|爱情|结婚|婚姻|对象|另一半|桃花|脱单|复合|分手|喜欢的人|暧昧|表白|异性缘|姻缘|伴侣|在一起|配不配|合适吗|般配/.test(q)) return 'love';
+  if (/事业|工作|财运|赚钱|理财|投资|职业|行业|跳槽|升职|加薪|创业|副业|收入|财富|适合做什么|考公|考研|面试/.test(q)) return 'career';
+  if (/健康|身体|生病|养生|精力|体质|运动|睡眠|压力|焦虑|心理/.test(q)) return 'health';
+  if (/性格|优缺点|什么样的人|人格|脾气|个性|天赋|特质|潜力|擅长/.test(q)) return 'personality';
+  if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|啥时候|几时/.test(q)) return 'timing';
+  return 'general';
+}
+
+/** 组合两层检测为 chartType + questionIntent（兼容现有 API） */
+function detectChartType(question: string): ChartType {
+  const scope = detectTimeScope(question);
+  if (scope === 'monthly') return 'lunar_return';
+  if (scope === 'yearly') return 'solar_return';
+  if (scope === 'transit') return 'transit';
   return 'natal';
 }
 
-/** 根据用户提问内容推断问题意图，用于选择专项 prompt 模板 */
 function detectIntent(question: string): QuestionIntent {
-  const q = question;
-  // 月运类
-  if (/月运|本月|这个月|这月|当月|月度|月返|\d{1,2}月份?的?运/.test(q)) return 'monthly';
-  // 年运类
-  if (/年运|今年|明年|后年|流年|本年|年度|\d{4}年|日返/.test(q)) return 'yearly';
-  // 感情/正缘类（优先级高于事业，因为"适合在一起"也是感情问题）
-  if (/正缘|感情|恋爱|爱情|结婚|婚姻|对象|另一半|桃花|脱单|复合|分手|喜欢的人|暧昧|表白|异性缘|姻缘|伴侣|在一起|配不配|合适吗|般配/.test(q)) return 'love';
-  // 事业/财运类
-  if (/事业|工作|财运|赚钱|理财|投资|职业|行业|跳槽|升职|加薪|创业|副业|收入|财富|适合做什么|考公|考研|面试/.test(q)) return 'career';
-  // 健康类
-  if (/健康|身体|生病|养生|精力|体质|运动|睡眠|压力|焦虑|心理/.test(q)) return 'health';
-  // 时机预测类（什么时候 + 具体事项）
-  if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|啥时候|几时/.test(q)) return 'timing';
-  // 性格分析类
-  if (/性格|优缺点|什么样的人|人格|脾气|个性|天赋|特质|潜力|擅长/.test(q)) return 'personality';
-  // 泛运势类（没匹配到具体领域，但提到了运势/最近/近期）
-  if (/运势|最近|近期|目前|当前|这段时间|未来/.test(q)) return 'timing';
-  // 默认全盘解读
+  const scope = detectTimeScope(question);
+  const topic = detectTopic(question);
+
+  // 有时间范围 + 有具体主题 → 组合意图（如 "monthly_love"）
+  // 传给 buildSystemPrompt 时用 analysisType 决定盘，questionIntent 决定主题
+  // 这里 questionIntent 只需反映主题，时间范围由 analysisType 处理
+  if (scope !== 'none' && topic !== 'general' && topic !== 'timing') {
+    return topic as QuestionIntent;
+  }
+  // 有时间范围但无具体主题 → 全维度周期运势
+  if (scope === 'monthly') return 'monthly';
+  if (scope === 'yearly') return 'yearly';
+  if (scope === 'transit' && topic === 'timing') return 'timing';
+  if (scope === 'transit') return 'timing';
+  // 无时间范围 → 纯主题
+  if (topic !== 'general') return topic as QuestionIntent;
   return 'general';
 }
 

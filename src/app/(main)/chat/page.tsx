@@ -1090,22 +1090,28 @@ function ChatContent() {
         ) : (
           /* ── Normal input ── */
           <div className="mx-auto max-w-2xl">
-            {/* Suggested questions chips */}
+            {/* Suggested questions */}
             {suggestions.length > 0 && !streaming && (
-              <div className="mb-2 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div className="mb-2.5 flex flex-col gap-1.5">
                 {suggestions.map((q, i) => (
                   <button
                     key={i}
                     onClick={() => sendMessage(q)}
-                    className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all active:scale-95"
+                    className="w-full rounded-xl px-3.5 py-2.5 text-left text-[13px] leading-snug transition-all active:scale-[0.98]"
                     style={{
-                      background: 'rgba(123,108,184,0.08)',
-                      color: 'var(--accent-primary)',
-                      border: '1px solid rgba(123,108,184,0.15)',
-                      maxWidth: '200px',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      background: 'var(--bg-base)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
+                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)';
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)';
+                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
                     }}
                   >
                     {q}

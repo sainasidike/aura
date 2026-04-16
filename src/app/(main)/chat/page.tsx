@@ -72,6 +72,7 @@ export default function ChatPage() {
 function ChatContent() {
   const searchParams = useSearchParams();
   const paramProfileId = searchParams.get('profileId');
+  const isFirstVisit = searchParams.get('firstVisit') === 'true';
 
   const [profile, setProfile] = useState<StoredProfile | null>(null);
   const [allChartData, setAllChartData] = useState<Record<string, unknown> | null>(null);
@@ -601,10 +602,10 @@ function ChatContent() {
                   ✦
                 </div>
                 <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  {allChartData ? '你好，我是你的 AI 占星师' : '正在准备排盘数据...'}
+                  {allChartData ? (isFirstVisit ? `${profile?.name}，你的星盘已生成` : '你好，我是你的 AI 占星师') : '正在准备排盘数据...'}
                 </p>
                 {allChartData && (() => {
-                  const natal = allChartData.natalChart as { planets?: { name: string; sign: string; degree: number; minute?: number }[]; houses?: unknown[]; aspects?: unknown[]; ascendant?: number } | undefined;
+                  const natal = allChartData.natalChart as AstrologyChart | undefined;
 
                   const sun = natal?.planets?.find(p => p.name === '太阳');
                   const moon = natal?.planets?.find(p => p.name === '月亮');
@@ -619,23 +620,42 @@ function ChatContent() {
                   const hasSummary = sun || moon || ascSign;
 
                   return hasSummary ? (
-                    <div className="mt-3 w-full max-w-xs rounded-xl px-4 py-3 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
-                      <p className="mb-1.5 text-[11px] font-medium tracking-wide" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>已加载星盘数据</p>
-                      {(sun || moon || ascSign) && (
-                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                          {sun && <span>☉ {sun.sign}{sun.degree}°{sun.minute != null ? String(sun.minute).padStart(2, '0') + "'" : ''}</span>}
-                          {sun && moon && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
-                          {moon && <span>☽ {moon.sign}{moon.degree}°{moon.minute != null ? String(moon.minute).padStart(2, '0') + "'" : ''}</span>}
-                          {(sun || moon) && ascSign && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
-                          {ascSign && <span>↑ {ascSign}座</span>}
-                        </p>
+                    <>
+                      {/* First visit: show natal chart SVG */}
+                      {isFirstVisit && natal && (
+                        <div className="mt-4 mb-2 w-full max-w-sm">
+                          <div
+                            className="overflow-hidden rounded-2xl"
+                            style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}
+                          >
+                            <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: 'linear-gradient(135deg, rgba(123,108,184,0.08), transparent)', borderBottom: '1px solid var(--border-subtle)' }}>
+                              <span className="flex h-5 w-5 items-center justify-center rounded-md text-[10px] text-white" style={{ background: 'var(--gradient-primary)' }}>✦</span>
+                              <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>本命星盘</span>
+                            </div>
+                            <div className="px-2 py-3">
+                              <NatalChartSVG chart={natal} hideAskAI />
+                            </div>
+                          </div>
+                        </div>
                       )}
-                      {planetCount > 0 && (
-                        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                          {planetCount} 颗行星 · {houseCount} 宫位 · {aspectCount} 个相位
-                        </p>
-                      )}
-                    </div>
+                      <div className="mt-3 w-full max-w-xs rounded-xl px-4 py-3 text-center" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                        <p className="mb-1.5 text-[11px] font-medium tracking-wide" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>已加载星盘数据</p>
+                        {(sun || moon || ascSign) && (
+                          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            {sun && <span>☉ {sun.sign}{sun.degree}°{sun.minute != null ? String(sun.minute).padStart(2, '0') + "'" : ''}</span>}
+                            {sun && moon && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
+                            {moon && <span>☽ {moon.sign}{moon.degree}°{moon.minute != null ? String(moon.minute).padStart(2, '0') + "'" : ''}</span>}
+                            {(sun || moon) && ascSign && <span style={{ color: 'var(--text-tertiary)' }}> · </span>}
+                            {ascSign && <span>↑ {ascSign}座</span>}
+                          </p>
+                        )}
+                        {planetCount > 0 && (
+                          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                            {planetCount} 颗行星 · {houseCount} 宫位 · {aspectCount} 个相位
+                          </p>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       基于你的完整星盘数据，试试以下问题
@@ -645,7 +665,7 @@ function ChatContent() {
               </div>
               {allChartData && (
                 <div className="flex flex-col items-center gap-3">
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>试试以下问题</p>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{isFirstVisit ? '你可以问我任何关于命盘的问题' : '试试以下问题'}</p>
                   <div className="stagger-children flex flex-wrap justify-center gap-2">
                   {COLD_START_QUESTIONS.map((q, i) => (
                     <button

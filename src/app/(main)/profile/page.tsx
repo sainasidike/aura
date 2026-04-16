@@ -61,7 +61,7 @@ function ProfileContent() {
       timezone: cityData?.timezone ?? 'Asia/Shanghai',
     });
     setLoading(false);
-    router.push('/fortune');
+    router.push('/chat?firstVisit=true');
   };
 
   const handleDelete = (id: string, name: string) => {

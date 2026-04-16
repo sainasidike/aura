@@ -764,6 +764,24 @@ export default function FortunePage() {
                 </div>
               </motion.div>
 
+              {/* View chart button */}
+              <div className="flex justify-center">
+                <Link
+                  href="/chart/astrology"
+                  className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all"
+                  style={{
+                    color: 'var(--accent-primary)',
+                    background: 'var(--accent-primary-dim)',
+                    border: '1px solid rgba(123,108,184,0.12)',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                  </svg>
+                  查看星盘
+                </Link>
+              </div>
+
               {/* Category detail cards */}
               {(() => { const _seenAsp = new Set<string>(); return CATEGORIES.map((cat, idx) => {
                 const data = fortune.categories[cat.key];

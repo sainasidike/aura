@@ -25,10 +25,14 @@ export async function POST(request: NextRequest) {
 
     // 如果提供了排盘数据，添加系统 prompt
     if (chartData) {
-      fullMessages.push({
-        role: 'system',
-        content: buildSystemPrompt(chartData, mode, analysisType),
-      });
+      try {
+        fullMessages.push({
+          role: 'system',
+          content: buildSystemPrompt(chartData, mode, analysisType),
+        });
+      } catch {
+        // buildSystemPrompt 失败时仍继续，只是没有系统提示
+      }
     }
 
     fullMessages.push(...messages);

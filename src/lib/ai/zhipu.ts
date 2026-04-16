@@ -106,10 +106,16 @@ export async function* streamChat(
 
       try {
         const parsed = JSON.parse(data);
+        // 检测流式错误响应（Zhipu 可能在流内返回错误）
+        if (parsed.error) {
+          throw new Error(parsed.error.message || parsed.error.code || 'AI 返回错误');
+        }
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) yield content;
-      } catch {
-        // skip malformed chunks
+      } catch (e) {
+        // 如果是我们主动抛出的错误，向上传播
+        if (e instanceof Error && !e.message.includes('JSON')) throw e;
+        // 其他 JSON 解析错误：跳过
       }
     }
   }
@@ -283,8 +289,13 @@ export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: st
 - 最后一个板块必须是 ---SUMMARY---
 - 总字数600-1000字`;
 
-  // 提取命盘预分析洞察
-  const insights = extractChartInsights(chartData);
+  // 提取命盘预分析洞察（try-catch 防止异常数据导致整个请求失败）
+  let insights = '';
+  try {
+    insights = extractChartInsights(chartData);
+  } catch {
+    // 预分析失败时静默降级，不影响主流程
+  }
 
   const INSIGHT_INSTRUCTION = insights ? `\n\n${insights}\n\n## 重要：如何使用上述洞察
 - 上述洞察是从排盘数据中用占星规则预先推导出的，已验证准确

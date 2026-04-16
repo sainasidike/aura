@@ -334,6 +334,16 @@ function ChatContent() {
       });
     }
 
+    // 流式结束后，检查助手消息是否为空（API 未返回内容）
+    setMessages(prev => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === 'assistant' && !last.content) {
+        last.content = '抱歉，AI 暂时无法生成回复，请稍后重试。';
+      }
+      return updated;
+    });
+
     setStreaming(false);
 
     // Parse suggested questions

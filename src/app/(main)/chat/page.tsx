@@ -16,6 +16,7 @@ import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
 type ChartType = 'natal' | 'transit' | 'solar_return' | 'lunar_return';
+export type QuestionIntent = 'general' | 'personality' | 'love' | 'career' | 'timing' | 'yearly' | 'monthly';
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   natal: '本命盘',
@@ -34,16 +35,30 @@ interface Message {
 /** 根据用户提问内容自动推断应使用的星盘类型 */
 function detectChartType(question: string): ChartType {
   const q = question.toLowerCase();
-  // 月运 / 本月 / 这个月 → 月返盘
   if (/月运|本月|这个月|这月|当月|月度|近一个月|最近一个月|月返/.test(q)) return 'lunar_return';
-  // 年运 / 今年 / 明年 / 2025年 / 流年 → 日返盘
   if (/年运|今年|明年|后年|去年|流年|本年|这一年|年度|\d{4}年|日返/.test(q)) return 'solar_return';
-  // 时机类问题 → 行运盘（"什么时候出现"、"何时"、"几岁"等）
   if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|会不会出现|啥时候|几时/.test(q)) return 'transit';
-  // 行运 / 最近运势 / 近期 / 当前 / 这段时间 → 行运盘
   if (/行运|最近|近期|当前|目前|这段时间|现在|眼下|运势|未来/.test(q)) return 'transit';
-  // 默认本命盘
   return 'natal';
+}
+
+/** 根据用户提问内容推断问题意图，用于选择专项 prompt 模板 */
+function detectIntent(question: string): QuestionIntent {
+  const q = question;
+  // 月运类
+  if (/月运|本月|这个月|这月|当月|月度|月返/.test(q)) return 'monthly';
+  // 年运类
+  if (/年运|今年|明年|后年|流年|本年|年度|\d{4}年|日返/.test(q)) return 'yearly';
+  // 感情/正缘类
+  if (/正缘|感情|恋爱|爱情|结婚|婚姻|对象|另一半|桃花|脱单|复合|分手|喜欢的人|暧昧|表白|异性缘|姻缘|伴侣/.test(q)) return 'love';
+  // 事业/财运类
+  if (/事业|工作|财运|赚钱|理财|投资|职业|行业|跳槽|升职|加薪|创业|副业|收入|财富|适合做什么|考公|考研|面试/.test(q)) return 'career';
+  // 时机预测类（什么时候 + 具体事项）
+  if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|啥时候|几时/.test(q)) return 'timing';
+  // 性格分析类
+  if (/性格|优缺点|什么样的人|人格|脾气|个性|天赋|特质|潜力|适合|擅长/.test(q)) return 'personality';
+  // 默认全盘解读
+  return 'general';
 }
 
 const COLD_START_QUESTIONS = [
@@ -255,11 +270,12 @@ function ChatContent() {
   const sendMessage = async (content: string) => {
     if (!content.trim() || streaming) return;
 
-    // Auto-detect which chart type to use based on the question
+    // Auto-detect which chart type and question intent
     const detectedType = astroContext?.analysisType
       ? (astroContext.analysisType as ChartType)
       : detectChartType(content.trim());
     const analysisType = detectedType === 'natal' ? undefined : detectedType;
+    const questionIntent = detectIntent(content.trim());
 
     const userMsg: Message = { role: 'user', content: content.trim(), timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
@@ -277,6 +293,7 @@ function ChatContent() {
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
           chartData: getChartData(),
           ...(analysisType ? { analysisType } : {}),
+          questionIntent,
         }),
       });
 

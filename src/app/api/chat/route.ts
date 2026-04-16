@@ -9,11 +9,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messages, chartData, mode, analysisType } = body as {
+    const { messages, chartData, mode, analysisType, questionIntent } = body as {
       messages: ZhipuMessage[];
       chartData?: Record<string, unknown>;
       mode?: string;
       analysisType?: string;
+      questionIntent?: string;
     };
 
     if (!messages || !Array.isArray(messages)) {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       try {
         fullMessages.push({
           role: 'system',
-          content: buildSystemPrompt(chartData, mode, analysisType),
+          content: buildSystemPrompt(chartData, mode, analysisType, questionIntent),
         });
       } catch {
         // buildSystemPrompt 失败时仍继续，只是没有系统提示

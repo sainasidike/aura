@@ -240,11 +240,12 @@ function compressChartData(data: Record<string, unknown>): string {
   return sections.join('\n\n');
 }
 
-/**
- * 构建命理分析的系统 prompt
- */
-export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: string, analysisType?: string): string {
-  const COMMON_RULES = `## 规则
+/* ═══════════════════════════════════════ */
+/* 意图专项 prompt 模板                      */
+/* ═══════════════════════════════════════ */
+
+/** 通用规则（所有意图共享） */
+const COMMON_RULES = `## 规则
 - 严格基于上述数据回答，禁止编造数据
 - 引用具体数据为依据（度数、宫位、天干地支等）
 - 措辞中性积极，分点论述
@@ -260,21 +261,11 @@ export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: st
 
 注意：[推荐追问] 必须独占一行，后面紧跟3行编号问题。`;
 
-  const CARD_FORMAT = `## 输出格式（严格遵守）
-根据用户问题选择3-5个最相关的板块，每个板块用标记分隔。可选板块：
----SUN--- 太阳与自我
----MOON--- 月亮与情感
----RISING--- 上升与外在
----VENUS--- 金星与爱情
----MARS--- 火星与行动力
----JUPITER--- 木星与机遇
----SATURN--- 土星与挑战
----MERCURY--- 水星与思维
----CAREER--- 事业与财运
----LOVE--- 感情与关系
----TRANSIT--- 行运与时机
----HEALTH--- 健康与精力
----SUMMARY--- 综合建议
+/** 卡片格式说明（按意图指定板块） */
+function buildCardFormat(sections: string): string {
+  return `## 输出格式（严格遵守）
+按以下板块顺序输出，每个板块用标记分隔：
+${sections}
 
 每个板块格式：
 ---标记--- 板块标题
@@ -288,73 +279,194 @@ export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: st
 - 🔮解读要深入具体，说明"为什么"而不只是"是什么"
 - 最后一个板块必须是 ---SUMMARY---
 - 总字数600-1000字`;
+}
 
-  // 提取命盘预分析洞察（try-catch 防止异常数据导致整个请求失败）
+/** 构建洞察指引（如果有预分析洞察） */
+function buildInsightBlock(chartData: Record<string, unknown>): string {
   let insights = '';
-  try {
-    insights = extractChartInsights(chartData);
-  } catch {
-    // 预分析失败时静默降级，不影响主流程
-  }
-
-  const INSIGHT_INSTRUCTION = insights ? `\n\n${insights}\n\n## 重要：如何使用上述洞察
+  try { insights = extractChartInsights(chartData); } catch { /* 静默降级 */ }
+  if (!insights) return '';
+  return `\n\n${insights}\n\n## 重要：如何使用上述洞察
 - 上述洞察是从排盘数据中用占星规则预先推导出的，已验证准确
 - 你的任务是**围绕这些洞察展开叙事**，用生动的场景和心理描写让用户感到"说的就是我"
-- 每个板块的🔮解读必须关联至少1条洞察，用具体生活场景来说明（比如"你可能在XXX场景中体验到..."）
+- 每个板块的🔮解读必须关联至少1条洞察，用具体生活场景来说明
 - 禁止泛泛而谈（如"你重视和谐""你适合创意工作"），必须说出**区别于其他人的独特之处**
-- 语气像一个见过你命盘的老朋友，直接、精准、有画面感` : '';
+- 语气像一个见过你命盘的老朋友，直接、精准、有画面感`;
+}
 
-  // 专项分析 — 运势类问题使用对应星盘
-  if (analysisType === 'transit') {
-    return `你是专业西洋占星师，正在使用**行运盘**分析近期运势。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
-当前使用的是行运盘（Transit Chart），分析行运行星与本命的交叉相位。
-重点：外行星（木土天海冥）长期影响 + 内行星触发效应，容许度越小影响越强。
-📊数据部分请优先引用【行运盘】和【行运×本命相位】的数据。
+/**
+ * 构建命理分析的系统 prompt
+ */
+export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: string, analysisType?: string, questionIntent?: string): string {
+  const insightBlock = buildInsightBlock(chartData);
+  const data = compressAstrologyOnly(chartData);
+  const intent = questionIntent || 'general';
+
+  // ─── 感情/正缘专项 ───
+  if (intent === 'love') {
+    return `你是专业西洋占星师，用户正在咨询**感情与正缘**。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **7宫头星座 & 7宫主落宫** → 定义理想伴侣类型和遇见场景
+2. **金星星座+宫位+相位** → 爱情风格、被什么类型吸引
+3. **5宫（恋爱宫）内行星** → 恋爱模式，是否有行星落入
+4. **月亮星座+宫位** → 情感安全感需求，内心真正想要什么
+5. **行运触发**（如有行运盘数据）→ 行运木星/金星过7宫或5宫 = 桃花窗口期
+关键：具体说出"你会被什么样的人吸引"、"感情中你最大的课题是什么"、"什么时间段感情机会最大"。禁止泛泛地说"你重视感情"之类的废话。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
+${data}${insightBlock}
 
-${CARD_FORMAT}
+${buildCardFormat(`---VENUS--- 你的爱情风格
+---LOVE--- 理想伴侣与遇见方式
+---MOON--- 情感深层需求
+---TRANSIT--- 桃花时机（若有行运数据）
+---SUMMARY--- 感情综合建议`)}
 
 ${COMMON_RULES}`;
   }
 
-  if (analysisType === 'solar_return') {
-    return `你是专业西洋占星师，正在使用**日返盘（太阳回归盘）**分析年度运势。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
-当前使用的是日返盘（Solar Return Chart），解读今年生日到明年生日的年度主题。
-重点：日返ASC（年度氛围）、MC（事业方向）、太阳落宫（核心领域）、月亮（情感）、角宫行星、紧密相位。
+  // ─── 事业/财运专项 ───
+  if (intent === 'career') {
+    return `你是专业西洋占星师，用户正在咨询**事业与财运**。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **10宫头星座 & MC度数 & 10宫主落宫** → 事业方向和天职
+2. **6宫（日常工作宫）内行星** → 工作风格和职场适应性
+3. **2宫头星座 & 2宫主** → 赚钱方式和财务模式
+4. **木星星座+宫位** → 人生最大机遇领域
+5. **土星星座+宫位+相位** → 事业中的核心挑战和需要修炼的能力
+6. **太阳宫位** → 最能发光的舞台
+关键：具体说出"你适合什么类型的工作环境"、"什么行业方向能发挥天赋"、"财运的关键转折点在哪里"。禁止笼统地说"你有事业心"。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(`---CAREER--- 天职与事业方向
+---SATURN--- 核心挑战与修炼
+---JUPITER--- 最大机遇领域
+---SUMMARY--- 事业财运综合建议`)}
+
+${COMMON_RULES}`;
+  }
+
+  // ─── 性格分析专项 ───
+  if (intent === 'personality') {
+    return `你是专业西洋占星师，用户想了解**自己的性格特质**。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **太阳星座+宫位** → 核心自我认同、人生目标和驱动力
+2. **月亮星座+宫位** → 内在情感模式、安全感来源、私下的真实状态
+3. **上升星座 + 命主星** → 别人第一眼看到的你、社交人格面具
+4. **水星星座+宫位** → 思维模式和沟通风格
+5. **日月相位** → 内外是否一致，内心有无矛盾拉扯
+6. **紧密相位（orb<3°）** → 性格中最突出的特征
+关键：不要列举教科书式的星座特质。要说出"你和同星座的人有什么不同"、"你最容易被误解的点是什么"、"你自己可能都没意识到的模式"。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(`---SUN--- 核心自我
+---MOON--- 内在情感
+---RISING--- 外在形象与社交面具
+---MERCURY--- 思维与沟通方式
+---SUMMARY--- 性格全貌与成长方向`)}
+
+${COMMON_RULES}`;
+  }
+
+  // ─── 时机预测专项 ───
+  if (intent === 'timing') {
+    const chartType = analysisType || 'transit';
+    return `你是专业西洋占星师，用户在问**时机相关问题**（什么时候、何时）。只使用西洋占星学体系。
+当前使用${chartType === 'transit' ? '行运盘（Transit Chart）' : chartType === 'solar_return' ? '日返盘' : '月返盘'}。
+
+## 分析框架（按此顺序看盘）
+1. **识别问题涉及的本命宫位**（感情看5/7宫，事业看6/10宫，财运看2/8宫）
+2. **找出行运外行星过该宫位的时间段** → 大趋势窗口
+3. **行运木星**（机遇触发器）→ 现在在哪个宫位，多久过境到目标宫位
+4. **行运土星**（结构性转变）→ 是否正在考验相关领域
+5. **行运内行星（金星/火星）过目标宫位** → 近期具体触发月份
+6. **交叉相位中容许度最小的** → 当下最活跃的能量
+关键：必须给出**具体的时间判断**（"XX行星将在XX时间段过你的X宫"），不能只说"未来会有机会"。用行运数据推导具体的时间窗口。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(`---TRANSIT--- 当前行运与关键触发
+---JUPITER--- 机遇窗口期
+---SATURN--- 挑战与考验期
+---SUMMARY--- 时机判断与行动建议`)}
+
+${COMMON_RULES}`;
+  }
+
+  // ─── 年运专项（日返盘） ───
+  if (intent === 'yearly' || analysisType === 'solar_return') {
+    return `你是专业西洋占星师，正在使用**日返盘（太阳回归盘）**分析年度运势。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **日返ASC星座** → 今年的整体氛围和生活基调
+2. **日返太阳落宫** → 今年核心能量集中的领域
+3. **日返月亮星座+宫位** → 今年的情感主题和内心需求
+4. **日返MC + 10宫行星** → 今年事业方向
+5. **日返盘中的紧密相位** → 年度关键事件的触发点
+6. **角宫（1/4/7/10宫）有无行星** → 今年哪些领域最活跃
 📊数据部分请优先引用【日返盘】的数据。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
+${data}${insightBlock}
 
-${CARD_FORMAT}
+${buildCardFormat(`---SUN--- 年度核心主题
+---CAREER--- 事业与发展方向
+---LOVE--- 感情与关系
+---TRANSIT--- 需要注意的时间节点
+---SUMMARY--- 年度综合建议`)}
 
 ${COMMON_RULES}`;
   }
 
-  if (analysisType === 'lunar_return') {
-    return `你是专业西洋占星师，正在使用**月返盘（月亮回归盘）**分析本月运势。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
-当前使用的是月返盘（Lunar Return Chart），解读本月（约27天）运势。
-重点：月返ASC（本月氛围）、月亮落宫（情感焦点）、太阳宫位、角宫行星、紧密相位。
+  // ─── 月运专项（月返盘） ───
+  if (intent === 'monthly' || analysisType === 'lunar_return') {
+    return `你是专业西洋占星师，正在使用**月返盘（月亮回归盘）**分析本月运势。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **月返ASC星座** → 本月生活氛围
+2. **月返月亮落宫** → 本月情感焦点和最在意的事
+3. **月返太阳宫位** → 本月精力投入方向
+4. **角宫行星** → 本月最活跃的领域
+5. **紧密相位** → 本月可能的关键事件
 📊数据部分请优先引用【月返盘】的数据。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
+${data}${insightBlock}
 
-${CARD_FORMAT}
+${buildCardFormat(`---MOON--- 本月情感与焦点
+---CAREER--- 工作与事务
+---LOVE--- 感情与社交
+---SUMMARY--- 本月综合建议`)}
 
 ${COMMON_RULES}`;
   }
 
-  // 默认：本命盘分析（卡片式分段输出）
+  // ─── 全盘解读（默认） ───
   return `你是专业西洋占星师。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
 当前使用的是本命盘（Natal Chart）。
 
-## 排盘数据
-${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
+## 分析框架（按此顺序看盘）
+1. **太阳+月亮+上升** → 三大核心：目标、情感、外在
+2. **日月相位** → 内外是否一致
+3. **紧密相位（orb<3°）** → 命盘中最突出的能量
+4. **宫位集中区域** → 人生重心在哪里
+5. **格局（T三角/大三角等）** → 人生核心模式
 
-${CARD_FORMAT}
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(`---SUN--- 太阳与自我
+---MOON--- 月亮与情感
+---RISING--- 上升与外在
+---SUMMARY--- 综合建议`)}
 
 ${COMMON_RULES}`;
 }

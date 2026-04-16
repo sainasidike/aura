@@ -1052,7 +1052,35 @@ function ChatContent() {
             );
           })}
 
-          {/* Suggestions removed from here — moved to bottom bar */}
+          {/* Inline suggested questions after last AI reply */}
+          {suggestions.length > 0 && !streaming && (
+            <div className="mx-auto max-w-2xl px-4 pb-2 flex flex-col gap-1.5">
+              {suggestions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendMessage(q)}
+                  className="w-full rounded-xl px-3.5 py-2.5 text-left text-[13px] leading-snug transition-all active:scale-[0.98]"
+                  style={{
+                    background: 'var(--bg-base)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)';
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -1092,35 +1120,6 @@ function ChatContent() {
         ) : (
           /* ── Normal input ── */
           <div className="mx-auto max-w-2xl">
-            {/* Suggested questions */}
-            {suggestions.length > 0 && !streaming && (
-              <div className="mb-2.5 flex flex-col gap-1.5">
-                {suggestions.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(q)}
-                    className="w-full rounded-xl px-3.5 py-2.5 text-left text-[13px] leading-snug transition-all active:scale-[0.98]"
-                    style={{
-                      background: 'var(--bg-base)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
-                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-primary)';
-                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-primary-dim)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)';
-                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
-                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-base)';
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
             <div className="flex gap-2.5">
             <input
               value={input}

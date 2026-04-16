@@ -95,7 +95,7 @@ const HOUSE_MEANING: Record<number, string> = {
 
 // ─── 洞察提取 ───
 
-export function extractChartInsights(data: Record<string, unknown>): string {
+export function extractChartInsights(data: Record<string, unknown>, questionIntent?: string): string {
   const natal = data.natalChart as ChartData | undefined;
   if (!natal?.planets?.length || !natal?.aspects?.length) return '';
 
@@ -103,6 +103,7 @@ export function extractChartInsights(data: Record<string, unknown>): string {
   const aspects = natal.aspects;
   const houses = natal.houses || [];
   const insights: string[] = [];
+  const intent = questionIntent || 'general';
 
   // ═══ 1. 命主星分析 ═══
   const ascSign = natal.ascendant != null ? lonToSign(natal.ascendant) : null;
@@ -278,9 +279,34 @@ export function extractChartInsights(data: Record<string, unknown>): string {
 
   if (insights.length === 0) return '';
 
-  // 限制洞察数量，保证 token 可控
-  const selected = insights.slice(0, 10);
+  // 按意图重排洞察优先级：把与当前问题最相关的排在前面
+  const sorted = sortInsightsByIntent(insights, intent);
+  const selected = sorted.slice(0, 8);
   return `## 命盘核心洞察（基于排盘数据的预分析，已验证准确）\n${selected.map((ins, i) => `${i + 1}. ${ins}`).join('\n')}`;
+}
+
+/** 根据问题意图对洞察排序，相关的排前面 */
+function sortInsightsByIntent(insights: string[], intent: string): string[] {
+  // 每个意图对应的高优先关键词
+  const INTENT_KEYWORDS: Record<string, RegExp> = {
+    love: /金星|7宫|婚姻|感情|伴侣|5宫|恋爱|月亮|情感|桃花/,
+    career: /10宫|事业|木星|土星|6宫|2宫|财|工作|职业|MC/,
+    personality: /命主星|太阳|月亮|上升|日月|性格|水星|思维|元素/,
+    timing: /行运|过宫|触发|木星|土星|窗口/,
+    yearly: /日返|年度|太阳/,
+    monthly: /月返|月亮|本月/,
+  };
+
+  const pattern = INTENT_KEYWORDS[intent];
+  if (!pattern) return insights;
+
+  const high: string[] = [];
+  const normal: string[] = [];
+  for (const ins of insights) {
+    if (pattern.test(ins)) high.push(ins);
+    else normal.push(ins);
+  }
+  return [...high, ...normal];
 }
 
 // ─── 辅助函数 ───

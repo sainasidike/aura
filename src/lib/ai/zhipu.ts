@@ -282,9 +282,9 @@ ${sections}
 }
 
 /** 构建洞察指引（如果有预分析洞察） */
-function buildInsightBlock(chartData: Record<string, unknown>): string {
+function buildInsightBlock(chartData: Record<string, unknown>, questionIntent?: string): string {
   let insights = '';
-  try { insights = extractChartInsights(chartData); } catch { /* 静默降级 */ }
+  try { insights = extractChartInsights(chartData, questionIntent); } catch { /* 静默降级 */ }
   if (!insights) return '';
   return `\n\n${insights}\n\n## 重要：如何使用上述洞察
 - 上述洞察是从排盘数据中用占星规则预先推导出的，已验证准确
@@ -298,9 +298,9 @@ function buildInsightBlock(chartData: Record<string, unknown>): string {
  * 构建命理分析的系统 prompt
  */
 export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: string, analysisType?: string, questionIntent?: string): string {
-  const insightBlock = buildInsightBlock(chartData);
-  const data = compressAstrologyOnly(chartData);
   const intent = questionIntent || 'general';
+  const insightBlock = buildInsightBlock(chartData, intent);
+  const data = compressAstrologyOnly(chartData);
 
   // ─── 感情/正缘专项 ───
   if (intent === 'love') {
@@ -397,6 +397,30 @@ ${buildCardFormat(`---TRANSIT--- 当前行运与关键触发
 ---JUPITER--- 机遇窗口期
 ---SATURN--- 挑战与考验期
 ---SUMMARY--- 时机判断与行动建议`)}
+
+${COMMON_RULES}`;
+  }
+
+  // ─── 健康专项 ───
+  if (intent === 'health') {
+    return `你是专业西洋占星师，用户正在咨询**健康与精力**。只使用西洋占星学体系。
+
+## 分析框架（按此顺序看盘）
+1. **6宫头星座 & 6宫内行星** → 日常健康模式、容易出问题的身体区域
+2. **上升星座** → 体质特征和天生的身体能量水平
+3. **火星星座+宫位** → 精力分配方式、适合的运动类型
+4. **月亮星座+宫位** → 情绪健康、压力的身体化表现
+5. **12宫行星（若有）** → 隐藏的健康隐患、心理层面的消耗
+6. **土星相位** → 需要长期注意的慢性议题
+关键：星座与身体部位的对应关系（白羊=头、金牛=喉、双子=手臂肺、巨蟹=胃、狮子=心脏、处女=肠胃、天秤=肾、天蝎=生殖系统、射手=肝胆腿、摩羯=骨骼关节、水瓶=循环系统、双鱼=足/免疫）。必须说明需要注意的具体方向，而非"注意健康"。
+
+## 排盘数据
+${data}${insightBlock}
+
+${buildCardFormat(`---HEALTH--- 体质与健康倾向
+---MARS--- 精力与运动
+---MOON--- 情绪与心理健康
+---SUMMARY--- 健康综合建议`)}
 
 ${COMMON_RULES}`;
   }

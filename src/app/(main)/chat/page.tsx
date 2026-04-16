@@ -16,7 +16,7 @@ import GlossaryPopup from '@/components/ui/GlossaryPopup';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
 type ChartType = 'natal' | 'transit' | 'solar_return' | 'lunar_return';
-export type QuestionIntent = 'general' | 'personality' | 'love' | 'career' | 'timing' | 'yearly' | 'monthly';
+export type QuestionIntent = 'general' | 'personality' | 'love' | 'career' | 'timing' | 'yearly' | 'monthly' | 'health';
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   natal: '本命盘',
@@ -53,6 +53,8 @@ function detectIntent(question: string): QuestionIntent {
   if (/正缘|感情|恋爱|爱情|结婚|婚姻|对象|另一半|桃花|脱单|复合|分手|喜欢的人|暧昧|表白|异性缘|姻缘|伴侣|在一起|配不配|合适吗|般配/.test(q)) return 'love';
   // 事业/财运类
   if (/事业|工作|财运|赚钱|理财|投资|职业|行业|跳槽|升职|加薪|创业|副业|收入|财富|适合做什么|考公|考研|面试/.test(q)) return 'career';
+  // 健康类
+  if (/健康|身体|生病|养生|精力|体质|运动|睡眠|压力|焦虑|心理/.test(q)) return 'health';
   // 时机预测类（什么时候 + 具体事项）
   if (/什么时候|何时|多久|哪年|哪个月|几月|几岁|时间点|时机|啥时候|几时/.test(q)) return 'timing';
   // 性格分析类

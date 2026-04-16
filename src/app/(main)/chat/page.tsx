@@ -299,6 +299,9 @@ function ChatContent() {
 
     setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: Date.now(), chartType: detectedType }]);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -309,6 +312,7 @@ function ChatContent() {
           ...(analysisType ? { analysisType } : {}),
           questionIntent,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -352,7 +356,8 @@ function ChatContent() {
         }
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : '回复失败';
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      const errMsg = isAbort ? 'AI 响应超时，请稍后重试' : (err instanceof Error ? err.message : '回复失败');
       setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
@@ -363,6 +368,8 @@ function ChatContent() {
         }
         return updated;
       });
+    } finally {
+      clearTimeout(timeout);
     }
 
     // 流式结束后，检查助手消息是否为空（API 未返回内容）

@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CITIES, searchCity } from '@/lib/cities';
-import { getProfiles, addProfile, deleteProfile, type StoredProfile } from '@/lib/storage';
+import { getProfiles, addProfile, deleteProfile, setActiveProfileId, type StoredProfile } from '@/lib/storage';
 
 export default function ProfilePage() {
   return (
@@ -54,14 +54,15 @@ function ProfileContent() {
     e.preventDefault();
     setLoading(true);
     const cityData = CITIES.find(c => c.name === form.city);
-    addProfile({
+    const newProfile = addProfile({
       ...form,
       longitude: cityData?.longitude ?? 116.40,
       latitude: cityData?.latitude ?? 39.90,
       timezone: cityData?.timezone ?? 'Asia/Shanghai',
     });
+    setActiveProfileId(newProfile.id);
     setLoading(false);
-    router.push('/chat?firstVisit=true');
+    router.push(`/chat?profileId=${newProfile.id}&firstVisit=true`);
   };
 
   const handleDelete = (id: string, name: string) => {

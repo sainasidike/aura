@@ -18,6 +18,16 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 type ChartType = 'natal' | 'transit' | 'solar_return' | 'lunar_return';
 export type QuestionIntent = 'general' | 'personality' | 'love' | 'career' | 'timing' | 'yearly' | 'monthly' | 'health';
 
+/** 渲染前移除消息末尾的推荐追问文本（避免与按钮重复） */
+function stripSuggestions(content: string): string {
+  return content
+    .replace(/```\s*\n?\[推荐[追问题]+\]\s*\n[\s\S]*?```\s*$/, '')
+    .replace(/\[推荐[追问题]+\]\s*\n[\s\S]*?$/, '')
+    .replace(/\*?\*?推荐[追问题]+\*?\*?[:：]\s*\n[\s\S]*?$/, '')
+    .replace(/推荐追问\s*[:：]?\s*\n[\s\S]*?$/, '')
+    .trimEnd();
+}
+
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   natal: '本命盘',
   transit: '行运盘',
@@ -734,7 +744,7 @@ function ChatContent() {
             // Check if this assistant message has card sections (including during streaming)
             const isStreamingThis = streaming && i === messages.length - 1;
             const cardSections = msg.role === 'assistant' && msg.content
-              ? parseChatSections(msg.content)
+              ? parseChatSections(stripSuggestions(msg.content))
               : null;
 
             // ── Card-style layout with left-right split ──
@@ -1020,7 +1030,7 @@ function ChatContent() {
                       <div
                         className="prose-chat"
                         onClick={handleGlossaryClick}
-                        dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(msg.content)), getChartData()) }}
+                        dangerouslySetInnerHTML={{ __html: annotateDataRefs(annotateGlossaryTerms(simpleMarkdown(stripSuggestions(msg.content))), getChartData()) }}
                       />
                     ) : (
                       <div className="flex items-center gap-1.5">

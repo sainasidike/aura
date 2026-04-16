@@ -5,6 +5,8 @@
  * API 兼容 OpenAI 格式
  */
 
+import { extractChartInsights } from './chart-insights';
+
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
 export interface ZhipuMessage {
@@ -281,6 +283,16 @@ export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: st
 - 最后一个板块必须是 ---SUMMARY---
 - 总字数600-1000字`;
 
+  // 提取命盘预分析洞察
+  const insights = extractChartInsights(chartData);
+
+  const INSIGHT_INSTRUCTION = insights ? `\n\n${insights}\n\n## 重要：如何使用上述洞察
+- 上述洞察是从排盘数据中用占星规则预先推导出的，已验证准确
+- 你的任务是**围绕这些洞察展开叙事**，用生动的场景和心理描写让用户感到"说的就是我"
+- 每个板块的🔮解读必须关联至少1条洞察，用具体生活场景来说明（比如"你可能在XXX场景中体验到..."）
+- 禁止泛泛而谈（如"你重视和谐""你适合创意工作"），必须说出**区别于其他人的独特之处**
+- 语气像一个见过你命盘的老朋友，直接、精准、有画面感` : '';
+
   // 专项分析 — 运势类问题使用对应星盘
   if (analysisType === 'transit') {
     return `你是专业西洋占星师，正在使用**行运盘**分析近期运势。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
@@ -289,7 +301,7 @@ export function buildSystemPrompt(chartData: Record<string, unknown>, _mode?: st
 📊数据部分请优先引用【行运盘】和【行运×本命相位】的数据。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}
+${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
 
 ${CARD_FORMAT}
 
@@ -303,7 +315,7 @@ ${COMMON_RULES}`;
 📊数据部分请优先引用【日返盘】的数据。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}
+${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
 
 ${CARD_FORMAT}
 
@@ -317,7 +329,7 @@ ${COMMON_RULES}`;
 📊数据部分请优先引用【月返盘】的数据。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}
+${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
 
 ${CARD_FORMAT}
 
@@ -329,7 +341,7 @@ ${COMMON_RULES}`;
 当前使用的是本命盘（Natal Chart）。
 
 ## 排盘数据
-${compressAstrologyOnly(chartData)}
+${compressAstrologyOnly(chartData)}${INSIGHT_INSTRUCTION}
 
 ${CARD_FORMAT}
 

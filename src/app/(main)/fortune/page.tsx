@@ -560,26 +560,42 @@ export default function FortunePage() {
       {/* ─── 运势内容 ─── */}
       {period && (
         <>
-          {/* Period tabs */}
-          <div
-            className="mb-4 inline-flex self-start rounded-full p-[3px]"
-            style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}
-          >
-            {PERIODS.map((p) => (
-              <motion.button
-                key={p.key}
-                onClick={() => handlePeriodChange(p.key)}
-                className="rounded-full px-4 py-2 text-xs font-medium"
-                style={{
-                  background: period === p.key ? "var(--gradient-primary)" : "transparent",
-                  color: period === p.key ? "white" : "var(--text-tertiary)",
-                  boxShadow: period === p.key ? "0 2px 8px rgba(123,108,184,0.20)" : "none",
-                }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {p.label}
-              </motion.button>
-            ))}
+          {/* Period tabs + view chart */}
+          <div className="mb-4 flex items-center justify-between">
+            <div
+              className="inline-flex rounded-full p-[3px]"
+              style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}
+            >
+              {PERIODS.map((p) => (
+                <motion.button
+                  key={p.key}
+                  onClick={() => handlePeriodChange(p.key)}
+                  className="rounded-full px-4 py-2 text-xs font-medium"
+                  style={{
+                    background: period === p.key ? "var(--gradient-primary)" : "transparent",
+                    color: period === p.key ? "white" : "var(--text-tertiary)",
+                    boxShadow: period === p.key ? "0 2px 8px rgba(123,108,184,0.20)" : "none",
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {p.label}
+                </motion.button>
+              ))}
+            </div>
+            <Link
+              href="/chart/astrology"
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all"
+              style={{
+                color: 'var(--accent-primary)',
+                background: 'var(--accent-primary-dim)',
+                border: '1px solid rgba(123,108,184,0.12)',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+              </svg>
+              查看星盘
+            </Link>
           </div>
 
           {/* ── 日期导航 ── */}
@@ -763,24 +779,6 @@ export default function FortunePage() {
                   })}
                 </div>
               </motion.div>
-
-              {/* View chart button */}
-              <div className="flex justify-center">
-                <Link
-                  href="/chart/astrology"
-                  className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all"
-                  style={{
-                    color: 'var(--accent-primary)',
-                    background: 'var(--accent-primary-dim)',
-                    border: '1px solid rgba(123,108,184,0.12)',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-                  </svg>
-                  查看星盘
-                </Link>
-              </div>
 
               {/* Category detail cards */}
               {(() => { const _seenAsp = new Set<string>(); return CATEGORIES.map((cat, idx) => {

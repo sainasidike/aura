@@ -39,8 +39,15 @@ const SECTION_META: Record<string, { icon: string; color: string }> = {
   SUMMARY:  { icon: '✧', color: '#7b6cb8' },
 };
 
-// Match: ---TAG--- optional title text
-const SECTION_RE = /^---([A-Z_]+)---\s*(.*)/;
+// Match section markers in various formats AI might produce:
+// Standard:     ---SUN--- 标题
+// Split line:   SUN--- 标题  (AI put --- on previous line as markdown hr)
+// Bracketed:    【SUN】标题
+// Hash-style:   ## SUN 标题  or  ## ☉ SUN 标题
+// Loose dashes: -- SUN -- 标题  or  —SUN— 标题
+const SECTION_RE = /^-{0,3}\s*([A-Z_]{2,10})\s*-{2,3}\s*(.*)/;
+const SECTION_RE_ALT = /^【([A-Z_]{2,10})】\s*(.*)/;
+const SECTION_RE_HASH = /^#{1,3}\s*(?:[☉☽↑♀♂♃♄☿◆♡⟳✦⚝✧✨]\s*)?([A-Z_]{2,10})\s*[:\-—]?\s*(.*)/;
 
 // Match emoji sub-section markers: 📊 数据：... / 🔮 解读：... / 💡 建议：...
 const PART_PATTERNS: { re: RegExp; type: SectionPart['type']; emoji: string; label: string }[] = [
@@ -100,11 +107,15 @@ export function parseChatSections(text: string): ChatSection[] | null {
   let current: ChatSection | null = null;
 
   for (const line of lines) {
-    const match = line.match(SECTION_RE);
-    if (match) {
+    // Skip pure markdown hr lines (---) that AI inserts before section markers
+    if (/^-{3,}\s*$/.test(line.trim())) continue;
+
+    // Try multiple regex patterns to match section markers
+    const match = line.match(SECTION_RE) || line.match(SECTION_RE_ALT) || line.match(SECTION_RE_HASH);
+    if (match && match[1] in SECTION_META) {
       if (current) sections.push(current);
       const tag = match[1];
-      const meta = SECTION_META[tag] || { icon: '•', color: '#7b6cb8' };
+      const meta = SECTION_META[tag];
       current = {
         tag,
         title: match[2].trim() || tag,

@@ -257,6 +257,8 @@ function ChatContent() {
   }, [messages, streaming]);
 
   const fetchAllChartData = async (p: StoredProfile) => {
+    // Create a new promise that sendMessage can await
+    chartReadyRef.current = new Promise<void>(resolve => { chartReadyResolveRef.current = resolve; });
     try {
       // 本命盘（bazi/ziwei）走缓存；行运/回归盘实时计算
       const body = {
@@ -296,16 +298,33 @@ function ChatContent() {
       }
       setAllChartData(data);
     } catch { /* chart fetch failed, can still chat */ }
+    finally { chartReadyResolveRef.current?.(); }
   };
+
+  // Ref to track latest allChartData (avoids stale closure in async sendMessage)
+  const allChartDataRef = useRef<Record<string, unknown> | null>(null);
+  useEffect(() => { allChartDataRef.current = allChartData; }, [allChartData]);
 
   const getChartData = (): Record<string, unknown> | null => {
     if (astroContext) return astroContext.chartData;
-    return allChartData;
+    return allChartDataRef.current;
   };
 
   // ─── Send message ───
+  // Promise that resolves when chart data finishes loading (success or fail)
+  const chartReadyRef = useRef<Promise<void>>(Promise.resolve());
+  const chartReadyResolveRef = useRef<(() => void) | null>(null);
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || streaming) return;
+
+    // 如果排盘数据还没加载完，等待（最多 8 秒）
+    if (!allChartDataRef.current && !astroContext) {
+      await Promise.race([
+        chartReadyRef.current,
+        new Promise<void>(r => setTimeout(r, 8000)),
+      ]);
+    }
 
     // Auto-detect which chart type and question intent
     const detectedType = astroContext?.analysisType

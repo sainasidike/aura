@@ -729,7 +729,7 @@ ${COMMON_RULES}`;
     const cards: string[] = [];
 
     // ── Card 1: SUN ──
-    cards.push(`---SUN--- ☀️ 太阳与核心自我
+    cards.push(`---SUN--- 太阳与核心自我
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${fmt(grouped.sun)}
 
@@ -739,7 +739,7 @@ ${fmt(grouped.sun)}
 💡 建议：从上面的分析中提炼1条具体行动建议。`);
 
     // ── Card 2: MOON ──
-    cards.push(`---MOON--- 🌙 月亮与内在情感
+    cards.push(`---MOON--- 月亮与内在情感
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${fmt(grouped.moon)}
 
@@ -749,7 +749,7 @@ ${fmt(grouped.moon)}
 💡 建议：1条关于情绪管理的具体建议。`);
 
     // ── Card 3: RISING ──
-    cards.push(`---RISING--- ⬆️ 上升与外在面具
+    cards.push(`---RISING--- 上升与外在面具
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${fmt(grouped.rising)}
 
@@ -761,7 +761,7 @@ ${fmt(grouped.rising)}
     // ── Card 4: LOVE ──
     const loveContent = fmt(grouped.love);
     if (loveContent) {
-      cards.push(`---LOVE--- 💕 感情与亲密关系
+      cards.push(`---LOVE--- 感情与亲密关系
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${loveContent}
 
@@ -774,7 +774,7 @@ ${loveContent}
     // ── Card 5: CAREER ──
     const careerContent = fmt(grouped.career);
     if (careerContent) {
-      cards.push(`---CAREER--- 💼 事业与天职
+      cards.push(`---CAREER--- 事业与天职
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${careerContent}
 
@@ -787,7 +787,7 @@ ${careerContent}
     // ── Card 6: PATTERN ──
     const patternContent = fmt(grouped.summary.filter(s => s.includes('格局') || s.includes('三角') || s.includes('北交点') || s.includes('南交点')));
     if (patternContent) {
-      cards.push(`---PATTERN--- 🔄 命盘格局与人生课题
+      cards.push(`---PATTERN--- 命盘格局与人生课题
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
 ${patternContent}
 
@@ -799,7 +799,7 @@ ${patternContent}
 
     // ── Card 7: SUMMARY ──
     const narrativeParts = grouped.summary.filter(s => !s.includes('格局') && !s.includes('三角') && !s.includes('北交点') && !s.includes('南交点'));
-    cards.push(`---SUMMARY--- ✨ 你的人生蓝图
+    cards.push(`---SUMMARY--- 你的人生蓝图
 综合以上所有板块的分析，写一段完整的人生画面（150-250字）。要求：
 - 串联太阳（核心驱动）、月亮（情感需求）、上升（外在呈现）的关键发现
 - ${grouped.love.length > 0 ? '融入感情模式的核心特征' : ''}
@@ -815,6 +815,8 @@ ${narrativeParts.length > 0 ? `\n参考叙事线索：\n${narrativeParts.map(s =
 2. 禁止自己另起炉灶编造分析，禁止忽略已有分析
 3. 禁止说"请提供出生日期/时间"——数据已齐全
 4. 只使用西洋占星学体系
+5. **输出中不要包含"你需要输出""已有分析""经过专业计算验证"等指导性文字**，直接输出📊🔮💡内容
+6. 每个板块只输出 ---TAG--- 标题 + 📊数据 + 🔮解读 + 💡建议，不要输出其他多余内容
 
 ## 改写示范（学习这个风格）
 原文：太阳天秤17°第3宫：在社交沟通领域追求平衡与美感，善于在日常交流中展现魅力和协调能力

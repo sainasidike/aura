@@ -35,6 +35,7 @@ const SECTION_META: Record<string, { icon: string; color: string }> = {
   LOVE:     { icon: '♡', color: '#d07090' },
   TRANSIT:  { icon: '⟳', color: '#8868b0' },
   HEALTH:   { icon: '✦', color: '#40a080' },
+  PATTERN:  { icon: '⚝', color: '#9070b0' },
   SUMMARY:  { icon: '✧', color: '#7b6cb8' },
 };
 

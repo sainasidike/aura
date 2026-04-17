@@ -246,8 +246,16 @@ function AstrologyContent() {
     }
   }, [profile, natalHour, natalMinute]);
 
-  // Auto-fetch natal on profile load
-  useEffect(() => { fetchNatal(); }, [profile]);
+  // Auto-fetch natal on profile load (use profile's hour/minute directly to avoid stale state)
+  useEffect(() => {
+    if (!profile) return;
+    setLoading(true);
+    setError('');
+    fetchNatalChart(profile, 'astrology')
+      .then(d => setNatalData(d as { timeInfo: unknown; chart: AstrologyChart }))
+      .catch(e => setError(e instanceof Error ? e.message : '计算失败'))
+      .finally(() => setLoading(false));
+  }, [profile]);
 
   // Fetch transit chart
   const fetchTransit = useCallback(() => {

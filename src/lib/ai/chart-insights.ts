@@ -354,6 +354,194 @@ export function extractChartInsights(data: Record<string, unknown>, questionInte
   return `## 命盘核心洞察（基于排盘数据的预分析，已验证准确）\n${selected.map((ins, i) => `${i + 1}. ${ins}`).join('\n')}${narrative}`;
 }
 
+/**
+ * 结构化洞察：按卡片主题分组
+ * 让 AI 的任务从"自己分析"变成"改写已有洞察"
+ */
+export interface GroupedInsights {
+  sun: string[];    // 太阳/自我/核心人格
+  moon: string[];   // 月亮/情感/内在需求
+  rising: string[]; // 上升/外在/命主星
+  love: string[];   // 感情/7宫/金星
+  career: string[]; // 事业/10宫/土星
+  health: string[]; // 健康/6宫/火星
+  summary: string[]; // 综合/格局/叙事
+}
+
+export function extractGroupedInsights(data: Record<string, unknown>, questionIntent?: string): GroupedInsights {
+  const result: GroupedInsights = { sun: [], moon: [], rising: [], love: [], career: [], health: [], summary: [] };
+
+  const natal = data.natalChart as ChartData | undefined;
+  if (!natal?.planets?.length || !natal?.aspects?.length) return result;
+
+  const planets = natal.planets;
+  const aspects = natal.aspects;
+  const houses = natal.houses || [];
+  const intent = questionIntent || 'general';
+
+  const sun = planets.find(p => p.name === '太阳');
+  const moon = planets.find(p => p.name === '月亮');
+  const ascSign = natal.ascendant != null ? lonToSign(natal.ascendant) : null;
+
+  // ── 太阳维度 ──
+  if (sun) {
+    const dignity = getDignityStatus(sun);
+    if (dignity) result.sun.push(dignity);
+
+    // 太阳的紧密相位
+    const sunAspects = aspects.filter(a =>
+      (a.planet1 === '太阳' || a.planet2 === '太阳') && a.orb <= 3
+      && a.planet1 !== '月亮' && a.planet2 !== '月亮' // 日月单独处理
+    ).sort((a, b) => a.orb - b.orb).slice(0, 2);
+    for (const sa of sunAspects) {
+      const other = sa.planet1 === '太阳' ? sa.planet2 : sa.planet1;
+      const meaning = getAspectMeaning('太阳', other, sa.type);
+      if (meaning) result.sun.push(`太阳${sa.type}${other}（${sa.orb}°）：${meaning}`);
+    }
+  }
+
+  // ── 月亮维度 ──
+  if (moon) {
+    const dignity = getDignityStatus(moon);
+    if (dignity) result.moon.push(dignity);
+
+    // 日月关系
+    if (sun) {
+      const sunMoonAspect = aspects.find(a =>
+        (a.planet1 === '太阳' && a.planet2 === '月亮') || (a.planet1 === '月亮' && a.planet2 === '太阳')
+      );
+      if (sunMoonAspect) {
+        const meanings: Record<string, string> = {
+          '合相': `日月合相（${sunMoonAspect.orb}°）：意志与情感高度统一，目标明确、内心笃定，但容易陷入主观视角，难以客观看待自己。新月出生，开创型人格。`,
+          '对冲': `日月对冲（${sunMoonAspect.orb}°）：理性追求与情感需求持续拉扯。外在表现的自己和内心真实感受常常矛盾。满月出生，关系型人格。`,
+          '四分': `日月四分（${sunMoonAspect.orb}°）：内在持续紧张感——想做的事和心里舒服的事经常冲突。这种摩擦是成长的发动机，但也容易焦虑。"理智选A但心里想选B"的场景会反复出现。`,
+          '三合': `日月三合（${sunMoonAspect.orb}°）：内外和谐，想做的事和情感需求天然一致。给人"舒服、通透"的感觉，但也可能因为太顺而缺乏突破动力。`,
+        };
+        const m = meanings[sunMoonAspect.type];
+        if (m) result.moon.push(m);
+      }
+    }
+
+    // 月亮的紧密相位
+    const moonAspects = aspects.filter(a =>
+      (a.planet1 === '月亮' || a.planet2 === '月亮') && a.orb <= 3
+      && a.planet1 !== '太阳' && a.planet2 !== '太阳'
+    ).sort((a, b) => a.orb - b.orb).slice(0, 2);
+    for (const ma of moonAspects) {
+      const other = ma.planet1 === '月亮' ? ma.planet2 : ma.planet1;
+      const meaning = getAspectMeaning('月亮', other, ma.type);
+      if (meaning) result.moon.push(`月亮${ma.type}${other}（${ma.orb}°）：${meaning}`);
+    }
+  }
+
+  // ── 上升/命主星维度 ──
+  if (ascSign) {
+    const rulerName = SIGN_RULER[ascSign];
+    const ruler = rulerName ? planets.find(p => p.name === rulerName) : null;
+    if (ruler) {
+      let text = `命主星${rulerName}落${ruler.sign}${ruler.degree}°第${ruler.house}宫（${HOUSE_MEANING[ruler.house] || ''}）`;
+      if (ruler.retrograde) text += '且逆行';
+      const tensionAsp = aspects.filter(a =>
+        (a.planet1 === rulerName || a.planet2 === rulerName) && (a.type === '四分' || a.type === '对冲') && a.orb <= 5
+      ).sort((a, b) => a.orb - b.orb)[0];
+      if (tensionAsp) {
+        const other = tensionAsp.planet1 === rulerName ? tensionAsp.planet2 : tensionAsp.planet1;
+        text += `。与${other}${tensionAsp.type}（${tensionAsp.orb}°），人生核心课题与${other}相关领域密切绑定`;
+      }
+      result.rising.push(text);
+    }
+  }
+
+  // ── 感情维度 ──
+  const venus = planets.find(p => p.name === '金星');
+  if (venus) {
+    const dignity = getDignityStatus(venus);
+    if (dignity) result.love.push(dignity);
+  }
+  if (houses.length >= 10) {
+    const h7Data = houses.find(h => h.number === 7);
+    if (h7Data) {
+      const h7Sign = lonToSign(h7Data.longitude);
+      const h7Ruler = SIGN_RULER[h7Sign];
+      const h7Planet = h7Ruler ? planets.find(p => p.name === h7Ruler) : null;
+      if (h7Planet) {
+        result.love.push(`7宫头${h7Sign}座，宫主星${h7Ruler}落第${h7Planet.house}宫（${HOUSE_MEANING[h7Planet.house] || ''}）：${getH7Insight(h7Planet.house)}`);
+      }
+    }
+  }
+  // 金星的相位
+  const venusAspects = aspects.filter(a =>
+    (a.planet1 === '金星' || a.planet2 === '金星') && a.orb <= 3
+  ).sort((a, b) => a.orb - b.orb).slice(0, 2);
+  for (const va of venusAspects) {
+    const other = va.planet1 === '金星' ? va.planet2 : va.planet1;
+    const meaning = getAspectMeaning('金星', other, va.type);
+    if (meaning) result.love.push(`金星${va.type}${other}（${va.orb}°）：${meaning}`);
+  }
+
+  // ── 事业维度 ──
+  if (houses.length >= 10) {
+    const h10Data = houses.find(h => h.number === 10);
+    if (h10Data) {
+      const h10Sign = lonToSign(h10Data.longitude);
+      const h10Ruler = SIGN_RULER[h10Sign];
+      const h10Planet = h10Ruler ? planets.find(p => p.name === h10Ruler) : null;
+      if (h10Planet) {
+        result.career.push(`10宫头${h10Sign}座，宫主星${h10Ruler}落第${h10Planet.house}宫（${HOUSE_MEANING[h10Planet.house] || ''}）：${getH10Insight(h10Planet.house)}`);
+      }
+    }
+  }
+  const saturn = planets.find(p => p.name === '土星');
+  if (saturn) {
+    const dignity = getDignityStatus(saturn);
+    if (dignity) result.career.push(dignity);
+  }
+
+  // ── 格局 → summary ──
+  const tSquares = findTSquares(planets, aspects);
+  for (const ts of tSquares) {
+    result.summary.push(getTSquareDetail(ts.apex, ts.apexHouse, ts.base1, ts.base2));
+  }
+  const grandTrines = findGrandTrines(planets, aspects);
+  for (const gt of grandTrines) {
+    const elem = getElement(gt.element);
+    result.summary.push(`大三角格局（${elem}象）：${gt.planets.join('、')}形成天赋闭环。在${ELEMENT_TALENT[elem]}方面有过人天赋。`);
+  }
+
+  // 南北交点 → summary
+  const northNode = planets.find(p => p.name === '北交点');
+  if (northNode) {
+    const nnSign = northNode.sign;
+    const nodeMeaning = NODE_SIGN_MEANING[nnSign];
+    const houseMeaning = NODE_HOUSE_MEANING[northNode.house];
+    let nodeText = `北交点${nnSign}第${northNode.house}宫：`;
+    if (nodeMeaning) nodeText += `灵魂成长方向是${nodeMeaning.north}。`;
+    if (houseMeaning) nodeText += houseMeaning;
+    result.summary.push(nodeText);
+  }
+
+  // 综合叙事
+  const allInsights = [...result.sun, ...result.moon, ...result.rising, ...result.love, ...result.career, ...result.summary];
+  const narrative = synthesizeNarrative(allInsights, planets);
+  if (narrative) result.summary.push(narrative.replace(/\n## 人生主题综合\n/, ''));
+
+  return result;
+}
+
+/** 获取行星尊贵状态描述 */
+function getDignityStatus(p: Planet): string {
+  const dom = PLANET_DOMICILE[p.name];
+  const exalt = PLANET_EXALT[p.name];
+  const det = PLANET_DETRIMENT[p.name];
+  const fall = PLANET_FALL[p.name];
+
+  if (dom?.includes(p.sign)) return `${p.name}入庙（${p.sign}${p.degree}°第${p.house}宫）：${getDignityScene(p.name, 'domicile', p.house)}`;
+  if (exalt === p.sign) return `${p.name}旺相（${p.sign}${p.degree}°第${p.house}宫）：${getDignityScene(p.name, 'exalt', p.house)}`;
+  if (det?.includes(p.sign)) return `${p.name}落陷（${p.sign}${p.degree}°第${p.house}宫）：${getDignityScene(p.name, 'detriment', p.house)}`;
+  if (fall === p.sign) return `${p.name}落弱（${p.sign}${p.degree}°第${p.house}宫）：${getDignityScene(p.name, 'fall', p.house)}`;
+  return '';
+}
+
 /** 根据问题意图对洞察排序，相关的排前面 */
 function sortInsightsByIntent(insights: string[], intent: string): string[] {
   // 每个意图对应的高优先关键词
@@ -412,7 +600,8 @@ const RETRO_MEANING: Record<string, string> = {
 };
 
 function getAspectMeaning(p1: string, p2: string, type: string): string {
-  const pair = [p1, p2].sort().join('+');
+  const pairA = [p1, p2].sort().join('+');
+  const pairB = `${p1}+${p2}`;
   const isHard = type === '四分' || type === '对冲';
 
   const meanings: Record<string, Record<string, string>> = {
@@ -470,7 +659,7 @@ function getAspectMeaning(p1: string, p2: string, type: string): string {
     },
   };
 
-  const m = meanings[pair];
+  const m = meanings[pairA] || meanings[pairB];
   if (!m) return '';
   return isHard ? m.hard : m.soft;
 }

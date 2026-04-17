@@ -5,7 +5,7 @@
  * API 兼容 OpenAI 格式
  */
 
-import { extractChartInsights } from './chart-insights';
+import { extractChartInsights, extractGroupedInsights } from './chart-insights';
 
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
@@ -718,7 +718,65 @@ ${buildCardFormat(`---MOON--- 本月情感与焦点
 ${COMMON_RULES}`;
   }
 
-  // ─── 全盘解读（默认） ───
+  // ─── 全盘解读（默认）— 使用预注入洞察 ───
+  const grouped = (() => { try { return extractGroupedInsights(chartData, intent); } catch { return null; } })();
+
+  if (grouped && (grouped.sun.length > 0 || grouped.moon.length > 0)) {
+    // 有结构化洞察：把洞察直接注入每张卡片，AI 只需改写
+    const fmtInsights = (arr: string[]) => arr.length > 0 ? arr.map(s => `- ${s}`).join('\n') : '（无特殊发现）';
+
+    return `你是专业西洋占星师。用户的排盘数据和**预分析结论**已在下方提供。
+**你的任务是把下方每个板块的"已有分析"用更生动、有画面感的语言改写成用户能看懂的文字。禁止忽略已有分析自己另起炉灶，禁止说"请提供出生日期"。**
+
+只使用西洋占星学体系。
+
+## 输出格式（严格遵守）
+按以下板块顺序输出，每个板块用标记分隔。
+
+---SUN--- 太阳与自我
+已有分析（必须围绕这些内容展开，不要自己另编）：
+${fmtInsights(grouped.sun)}
+请基于以上分析写出：
+📊 数据：引用1-2个具体数据
+🔮 解读：把上面的分析改写成有画面感的文字（80-150字）。必须保留核心结论，用具体生活场景说明。
+💡 建议：基于以上分析给出1条具体可执行的建议
+
+---MOON--- 月亮与情感
+已有分析：
+${fmtInsights(grouped.moon)}
+请基于以上分析写出：
+📊 数据：引用1-2个具体数据
+🔮 解读：改写为有画面感的文字（80-150字）
+💡 建议：1条具体建议
+
+---RISING--- 上升与外在
+已有分析：
+${fmtInsights(grouped.rising)}
+请基于以上分析写出：
+📊 数据：引用1-2个具体数据
+🔮 解读：改写为有画面感的文字（80-150字）
+💡 建议：1条具体建议
+
+---SUMMARY--- 综合建议
+已有分析：
+${fmtInsights(grouped.summary)}
+${grouped.love.length > 0 ? `感情关键：\n${fmtInsights(grouped.love)}` : ''}
+${grouped.career.length > 0 ? `事业关键：\n${fmtInsights(grouped.career)}` : ''}
+请基于以上所有分析，写一段综合性的人生蓝图（150-250字）。串联太阳、月亮、上升、感情、事业的关键发现，让用户看到完整的人生画面。
+
+## 改写标准（极重要）
+- 你的任务是**改写**已有分析，不是自己重新分析。已有分析的核心结论不能丢。
+- 用具体场景代替抽象描述："内心渴望深层连接" → "你不喜欢寒暄式的社交，更想和少数几个人聊到凌晨三点那种深度对话"
+- 禁止的废话句式：❌"保持开放/积极/灵活" ❌"需要耐心和坚持" ❌"可能会有变化"
+- 语气像一个见过你命盘的老朋友，直接、精准、不说废话
+
+## 排盘数据（参考用，核心结论已在上方各板块中）
+${data}
+
+${COMMON_RULES}`;
+  }
+
+  // 无洞察时的降级模式
   return `你是专业西洋占星师。只使用西洋占星学体系，禁止八字、紫微斗数、五行等概念。
 当前使用的是本命盘（Natal Chart）。
 **重要：用户的完整排盘数据已在下方提供，你必须直接基于这些数据进行分析。禁止说"请提供出生日期/时间/地点"之类的话——数据已经齐全，直接分析。**

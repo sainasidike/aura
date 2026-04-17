@@ -185,10 +185,10 @@ export function extractChartInsights(data: Record<string, unknown>, questionInte
 
   // ═══ 4. 格局识别 ═══
 
-  // T三角：A四分B，B四分C，A对冲C
+  // T三角：A四分B，B四分C，A对冲C — 增强版：输出具体压力模式
   const tSquares = findTSquares(planets, aspects);
   for (const ts of tSquares) {
-    insights.push(`T三角格局：${ts.apex}（顶点）与${ts.base1}、${ts.base2}形成强张力三角。${ts.apex}所在的第${ts.apexHouse}宫（${HOUSE_MEANING[ts.apexHouse] || ''}）是人生核心压力区，也是最大成长点。这个格局驱动你不断在该领域突破，但也容易感到疲惫。`);
+    insights.push(getTSquareDetail(ts.apex, ts.apexHouse, ts.base1, ts.base2));
   }
 
   // 大三角
@@ -212,7 +212,7 @@ export function extractChartInsights(data: Record<string, unknown>, questionInte
     }
   }
 
-  // ═══ 6. 行星尊贵与失势 ═══
+  // ═══ 6. 行星尊贵与失势 — 增强版：场景化描述 ═══
   for (const p of planets) {
     if (p.name === '北交点') continue;
     const dom = PLANET_DOMICILE[p.name];
@@ -221,45 +221,110 @@ export function extractChartInsights(data: Record<string, unknown>, questionInte
     const fall = PLANET_FALL[p.name];
 
     if (dom?.includes(p.sign)) {
-      insights.push(`${p.name}入庙（${p.sign}${p.degree}°第${p.house}宫）：${p.name}在自己的领地，能量表达自如。在${HOUSE_MEANING[p.house] || '该领域'}有天然优势和自信。`);
+      const scene = getDignityScene(p.name, 'domicile', p.house);
+      insights.push(`${p.name}入庙（${p.sign}${p.degree}°第${p.house}宫）：${scene}。`);
     } else if (exalt === p.sign) {
-      insights.push(`${p.name}旺相（${p.sign}${p.degree}°第${p.house}宫）：${p.name}能量被放大，在${HOUSE_MEANING[p.house] || '该领域'}表现突出，但也可能过度膨胀。`);
+      const scene = getDignityScene(p.name, 'exalt', p.house);
+      insights.push(`${p.name}旺相（${p.sign}${p.degree}°第${p.house}宫）：${scene}。`);
     } else if (det?.includes(p.sign)) {
-      insights.push(`${p.name}落陷（${p.sign}${p.degree}°第${p.house}宫）：${p.name}的能量受限，需要更多努力才能在${HOUSE_MEANING[p.house] || '该领域'}达到满意状态。这不是缺陷，而是需要后天修炼的课题。`);
+      const scene = getDignityScene(p.name, 'detriment', p.house);
+      insights.push(`${p.name}落陷（${p.sign}${p.degree}°第${p.house}宫）：${scene}。`);
     } else if (fall === p.sign) {
-      insights.push(`${p.name}落弱（${p.sign}${p.degree}°第${p.house}宫）：${p.name}表达不畅，在${HOUSE_MEANING[p.house] || '该领域'}可能感到力不从心，但通过意识觉察可以转化。`);
+      const scene = getDignityScene(p.name, 'fall', p.house);
+      insights.push(`${p.name}落弱（${p.sign}${p.degree}°第${p.house}宫）：${scene}。`);
     }
   }
 
-  // ═══ 7. 逆行行星 ═══
+  // ═══ 7. 逆行行星 — 增强版：结合宫位场景 ═══
   const retroPlanets = planets.filter(p => p.retrograde && p.name !== '北交点' && PERSONAL_PLANETS.includes(p.name));
   if (retroPlanets.length > 0) {
     for (const rp of retroPlanets) {
-      const meaning = RETRO_MEANING[rp.name];
-      if (meaning) {
-        insights.push(`${rp.name}逆行（${rp.sign}第${rp.house}宫）：${meaning}`);
+      const baseMeaning = RETRO_MEANING[rp.name];
+      const houseContext = RETRO_HOUSE_CONTEXT[rp.name]?.[rp.house];
+      if (baseMeaning) {
+        let text = `${rp.name}逆行（${rp.sign}${rp.degree}°第${rp.house}宫）：${baseMeaning}`;
+        if (houseContext) {
+          text += ` 落在第${rp.house}宫具体表现为：${houseContext}。`;
+        } else {
+          text += ` 在第${rp.house}宫（${HOUSE_MEANING[rp.house] || ''}），这种逆行特质在${HOUSE_MEANING[rp.house] || '该领域'}体现得最为明显。`;
+        }
+        insights.push(text);
       }
     }
   }
 
-  // ═══ 8. 7宫主（感情模式）& 10宫主（事业模式）═══
+  // ═══ 8. 宫主星飞布 — 增强版：根据意图选择关键宫位，全12宫支持 ═══
   if (houses.length >= 10) {
-    const h7Sign = lonToSign(houses.find(h => h.number === 7)?.longitude ?? 0);
-    const h7Ruler = SIGN_RULER[h7Sign];
-    const h7RulerPlanet = h7Ruler ? planets.find(p => p.name === h7Ruler) : null;
-    if (h7RulerPlanet) {
-      insights.push(`7宫（婚姻宫）头${h7Sign}座，宫主星${h7Ruler}落第${h7RulerPlanet.house}宫（${HOUSE_MEANING[h7RulerPlanet.house] || ''}）：感情模式与${HOUSE_MEANING[h7RulerPlanet.house] || '该领域'}深度绑定。${getH7Insight(h7RulerPlanet.house)}`);
-    }
+    const relevantHouses = getRelevantHousesForIntent(intent);
 
-    const h10Sign = lonToSign(houses.find(h => h.number === 10)?.longitude ?? 0);
-    const h10Ruler = SIGN_RULER[h10Sign];
-    const h10RulerPlanet = h10Ruler ? planets.find(p => p.name === h10Ruler) : null;
-    if (h10RulerPlanet) {
-      insights.push(`10宫（事业宫）头${h10Sign}座，宫主星${h10Ruler}落第${h10RulerPlanet.house}宫（${HOUSE_MEANING[h10RulerPlanet.house] || ''}）：事业发展路径与${HOUSE_MEANING[h10RulerPlanet.house] || '该领域'}联动。${getH10Insight(h10RulerPlanet.house)}`);
+    for (const hn of relevantHouses) {
+      const houseData = houses.find(h => h.number === hn);
+      if (!houseData) continue;
+      const hSign = lonToSign(houseData.longitude);
+      const hRuler = SIGN_RULER[hSign];
+      const hRulerPlanet = hRuler ? planets.find(p => p.name === hRuler) : null;
+      if (!hRulerPlanet) continue;
+
+      const houseName = HOUSE_MEANING[hn] || '';
+      const targetHouseName = HOUSE_MEANING[hRulerPlanet.house] || '';
+
+      // 查找是否有预定义的飞布组合洞察
+      const dispKey = `${hn}-${hRulerPlanet.house}`;
+      const dispInsight = DISPOSITION_KEY[dispKey];
+
+      if (hn === 7 && intent !== 'career') {
+        // 7宫保留原有详细解读
+        insights.push(`7宫（${houseName}）头${hSign}座，宫主星${hRuler}落第${hRulerPlanet.house}宫（${targetHouseName}）：感情模式与${targetHouseName}深度绑定。${getH7Insight(hRulerPlanet.house)}`);
+      } else if (hn === 10 && intent !== 'love') {
+        // 10宫保留原有详细解读
+        insights.push(`10宫（${houseName}）头${hSign}座，宫主星${hRuler}落第${hRulerPlanet.house}宫（${targetHouseName}）：事业发展路径与${targetHouseName}联动。${getH10Insight(hRulerPlanet.house)}`);
+      } else if (dispInsight) {
+        // 有预定义组合
+        insights.push(`第${hn}宫（${houseName}）头${hSign}座，宫主星${hRuler}飞入第${hRulerPlanet.house}宫（${targetHouseName}）：${dispInsight}。`);
+      } else if (hn !== hRulerPlanet.house) {
+        // 通用飞布描述
+        insights.push(`第${hn}宫（${houseName}）头${hSign}座，宫主星${hRuler}飞入第${hRulerPlanet.house}宫（${targetHouseName}）：${houseName}的发展与${targetHouseName}密切关联。`);
+      }
     }
   }
 
-  // ═══ 9. 个人行星与外行星的紧密相位 ═══
+  // ═══ 9. 南北交点 — 灵魂进化方向 ═══
+  const northNode = planets.find(p => p.name === '北交点');
+  if (northNode) {
+    const nnSign = northNode.sign;
+    const nnHouse = northNode.house;
+    const snSign = SIGNS[(SIGNS.indexOf(nnSign) + 6) % 12]; // 南交点在对面星座
+    const snHouse = nnHouse <= 6 ? nnHouse + 6 : nnHouse - 6;
+
+    const nodeMeaning = NODE_SIGN_MEANING[nnSign];
+    const houseMeaning = NODE_HOUSE_MEANING[nnHouse];
+
+    let nodeInsight = `北交点${nnSign}${northNode.degree}°第${nnHouse}宫 / 南交点${snSign}第${snHouse}宫：`;
+    if (nodeMeaning) {
+      nodeInsight += `灵魂成长方向是${nodeMeaning.north}。${nodeMeaning.south}。`;
+    }
+    if (houseMeaning) {
+      nodeInsight += houseMeaning + '。';
+    }
+
+    // 检查是否有行星与北交点形成紧密相位
+    const nodeAspects = aspects.filter(a =>
+      (a.planet1 === '北交点' || a.planet2 === '北交点') && a.orb <= 5
+    ).sort((a, b) => a.orb - b.orb).slice(0, 2);
+
+    for (const na of nodeAspects) {
+      const otherPlanet = na.planet1 === '北交点' ? na.planet2 : na.planet1;
+      if (na.type === '合相') {
+        nodeInsight += `${otherPlanet}合相北交点，这颗星的能量是你灵魂成长的核心推动力。`;
+      } else if (na.type === '四分') {
+        nodeInsight += `${otherPlanet}四分南北交点轴，构成"跳脱点"——${otherPlanet}代表的能量是打破过去模式的关键。`;
+      }
+    }
+
+    insights.push(nodeInsight);
+  }
+
+  // ═══ 10. 个人行星与外行星的紧密相位 ═══
   const personalOuter = aspects.filter(a => {
     const isPersonal1 = PERSONAL_PLANETS.includes(a.planet1);
     const isOuter2 = OUTER_PLANETS.includes(a.planet2);
@@ -281,8 +346,12 @@ export function extractChartInsights(data: Record<string, unknown>, questionInte
 
   // 按意图重排洞察优先级：把与当前问题最相关的排在前面
   const sorted = sortInsightsByIntent(insights, intent);
-  const selected = sorted.slice(0, 8);
-  return `## 命盘核心洞察（基于排盘数据的预分析，已验证准确）\n${selected.map((ins, i) => `${i + 1}. ${ins}`).join('\n')}`;
+  const selected = sorted.slice(0, 12); // 增加到12条以容纳新维度
+
+  // 综合叙事
+  const narrative = synthesizeNarrative(selected, planets);
+
+  return `## 命盘核心洞察（基于排盘数据的预分析，已验证准确）\n${selected.map((ins, i) => `${i + 1}. ${ins}`).join('\n')}${narrative}`;
 }
 
 /** 根据问题意图对洞察排序，相关的排前面 */
@@ -538,4 +607,219 @@ function getH10Insight(house: number): string {
     12: '事业可能与幕后工作相关——研究、灵性、医疗、艺术等需要独处的领域。',
   };
   return m[house] || '';
+}
+
+// ─── 增强模块：逆行 + 宫位组合 ───
+
+const RETRO_HOUSE_CONTEXT: Record<string, Record<number, string>> = {
+  '水星': {
+    1: '自我表达常常"话到嘴边又咽回去"，第一印象可能显得沉默或内敛',
+    3: '写的比说的好，适合文字工作但口头沟通容易出状况',
+    6: '工作中容易因沟通失误返工，但非常适合需要反复核查的工作',
+    7: '与伴侣的沟通模式需要反复磨合，容易误解对方的意思',
+    9: '学习方式独特，可能需要反复研读才能理解，但一旦理解就非常深刻',
+    10: '职场表达容易被误读，但深度思考的能力是隐藏优势',
+  },
+  '金星': {
+    1: '对自身外貌和魅力缺乏自信，实际上别人眼中的你比你以为的有吸引力',
+    2: '花钱容易后悔，但品味经过时间沉淀后会越来越好',
+    5: '恋爱中表达爱意的方式含蓄，不擅长浪漫但感情深沉',
+    7: '对伴侣的标准反复调整，可能在前任和新欢之间犹豫',
+    8: '深层亲密关系中有不安全感，但一旦信任就全情投入',
+    12: '审美和感情生活有隐秘的一面，内心的喜好不轻易示人',
+  },
+  '火星': {
+    1: '行动启动慢但一旦启动就势不可挡，容易让人觉得"突然爆发"',
+    3: '说话容易"不经过脑子"然后后悔，学会三思后言是课题',
+    6: '工作节奏忽快忽慢，适合有deadline驱动的工作模式',
+    7: '在关系中压抑攻击性，但可能以被动攻击方式释放',
+    10: '事业上有野心但不轻易展露，容易在关键时刻犹豫错失机会',
+    12: '愤怒和欲望被压入潜意识，需要找到健康的出口（运动、创作）',
+  },
+};
+
+// ─── 增强模块：南北交点 ───
+
+const NODE_SIGN_MEANING: Record<string, { north: string; south: string }> = {
+  '白羊': { north: '学习独立和果断行动', south: '过去习惯合作和妥协，但需要学会为自己站出来' },
+  '金牛': { north: '建立物质安全感和稳定价值观', south: '习惯在危机和变动中生存，需要学会安定下来' },
+  '双子': { north: '发展沟通和多元学习能力', south: '有坚定信念但视野可能狭窄，需要保持开放心态' },
+  '巨蟹': { north: '建立情感连接和安全感', south: '过度专注事业和社会地位，需要学会照顾内心' },
+  '狮子': { north: '勇敢表达自我和创造力', south: '习惯隐没在群体中，需要敢于站到聚光灯下' },
+  '处女': { north: '培养实际技能和服务精神', south: '容易沉浸在梦想中，需要脚踏实地' },
+  '天秤': { north: '学习建立和谐的伴侣关系', south: '过于独立，需要学会平等合作和妥协' },
+  '天蝎': { north: '拥抱深层转化和亲密关系', south: '追求稳定安逸，需要敢于面对人生的深水区' },
+  '射手': { north: '追寻信仰、远方和人生意义', south: '困在信息收集中，需要看到大图景' },
+  '摩羯': { north: '建立事业结构和承担社会责任', south: '依赖家庭和情感安全感，需要在社会中独立立足' },
+  '水瓶': { north: '服务集体和突破传统框架', south: '习惯成为焦点，需要学会为群体贡献' },
+  '双鱼': { north: '发展灵性、同理心和无条件的爱', south: '追求完美和秩序，需要学会放手和信任' },
+};
+
+const NODE_HOUSE_MEANING: Record<number, string> = {
+  1: '灵魂成长方向指向自我独立——学会不依赖他人的认可来定义自己',
+  2: '灵魂课题在于建立自己的价值体系和经济独立',
+  3: '灵魂成长通过日常沟通、写作、学习来实现',
+  4: '灵魂渴望建立情感根基和内在安全感',
+  5: '灵魂成长方向是勇敢创造和表达自我，包括恋爱和生育',
+  6: '灵魂需要通过日常工作和服务找到人生意义',
+  7: '灵魂成长的核心课题是学会在关系中合作与平衡',
+  8: '灵魂需要经历深层转化，通过放手旧的来获得新生',
+  9: '灵魂渴望通过更高的学习、旅行或信仰找到人生方向',
+  10: '灵魂成长指向事业成就和社会责任的承担',
+  11: '灵魂需要走进更大的社群，为集体理想贡献力量',
+  12: '灵魂成长方向是灵性觉醒和超越物质世界的局限',
+};
+
+// ─── 增强模块：T三角具体压力模式 ───
+
+function getTSquareDetail(apex: string, apexHouse: number, base1: string, base2: string): string {
+  const pressureType: Record<string, string> = {
+    '太阳': '自我认同受到持续挑战，容易在"我是谁"和"别人怎么看我"之间拉扯',
+    '月亮': '情绪是最大的战场——内心的不安全感驱动你不断寻找安慰，但越寻找越焦虑',
+    '水星': '思维永远在高速运转，想法很多但容易分散，可能有焦虑性思维或决策困难',
+    '金星': '在感情和审美方面永远不满足，容易在"想要的"和"适合的"之间反复',
+    '火星': '行动力被双向拉扯——想冲但总被拦，被拦又更想冲。容易急躁或以攻击性方式释放压力',
+    '木星': '野心和能力之间有落差，容易过度承诺或膨胀，需要学会量力而行',
+    '土星': '人生中有一个持续的"卡点"——某个领域总是进展缓慢，但这也是你最终成就最大的地方',
+    '天王星': '生活中总有突变和打断，刚稳定下来又被推翻。但你因此培养了超强的适应能力',
+    '海王星': '理想与现实的落差是核心痛点，容易被幻觉欺骗或逃避现实，但创造力也来自这种张力',
+    '冥王星': '人生中反复经历"死亡与重生"，某些领域会被彻底摧毁再重建。痛苦但也因此拥有超乎常人的深度',
+  };
+
+  const detail = pressureType[apex] || '该行星代表的领域承受持续压力';
+  const houseArea = HOUSE_MEANING[apexHouse] || '';
+
+  return `T三角格局：${apex}（顶点，第${apexHouse}宫）与${base1}、${base2}形成强张力三角。${detail}。这股压力集中在第${apexHouse}宫（${houseArea}）——这里是你人生最大的挑战，也是突破后收获最大的地方。${base1}和${base2}的对冲是压力源头，${apex}是你被迫面对和解决问题的出口。`;
+}
+
+// ─── 增强模块：行星尊贵场景化 ───
+
+function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detriment' | 'fall', house: number): string {
+  const houseArea = HOUSE_MEANING[house] || '该领域';
+
+  const scenes: Record<string, Record<string, string>> = {
+    '太阳': {
+      domicile: '自信而耀眼，像回到了自己的王国。在人群中自然成为焦点，领导力和创造力浑然天成',
+      exalt: '意志力和生命力被放大，精力充沛、行动果断，但也可能过于强势或独断',
+      detriment: '自我意识受群体压力制约，可能为了"合群"压抑真实想法。需要在保持个性和融入集体之间找平衡',
+      fall: '自信心容易受外界评价影响，做决定时总在权衡利弊而犹豫。但这也让你比别人更懂得倾听',
+    },
+    '月亮': {
+      domicile: '情感表达自然流畅，直觉准确，共情能力强。在家庭和亲密关系中如鱼得水',
+      exalt: '情感需求与物质安全感结合良好，内心踏实稳定，但可能过于依赖舒适区',
+      detriment: '情感表达被"应该坚强"的信念压制，不容易示弱但内心渴望被照顾。表达脆弱是重要课题',
+      fall: '情绪容易被深层恐惧和猜疑所困，对亲密关系既渴望又恐惧。但拥有惊人的情感洞察力',
+    },
+    '水星': {
+      domicile: '思维敏捷、表达能力强，学什么都快，沟通能力是天赋',
+      exalt: '逻辑分析和细节处理能力极强，适合需要精确思维的工作',
+      detriment: '思维容易发散或被直觉带偏，注意力难以长时间集中在细节上。但想象力和大局观是独特优势',
+      fall: '逻辑思维被情感和直觉影响，需要刻意训练。但天生的同理心让你擅长理解他人',
+    },
+    '金星': {
+      domicile: '审美品味好、社交魅力强、感情中懂得给予和接收爱。物质运和桃花运都不错',
+      exalt: '对美和爱有超越世俗的理解，浪漫感十足，艺术天赋高。但容易理想化感情',
+      detriment: '感情中容易走极端——要么全身心投入要么彻底切割。需要在激情和理性之间找平衡',
+      fall: '对自己的吸引力缺乏信心，审美偏好可能过于自我批判。但这种挑剔也能发展出极高的品味',
+    },
+    '火星': {
+      domicile: '行动力强、决断果敢、竞争力十足。天生的战士，适合需要冲劲的领域',
+      exalt: '行动力与战略思维结合，执行力强且有耐心等待最佳时机',
+      detriment: '行动力被犹豫不决拖慢，可能在该出手时错失良机。但学会了在行动前三思',
+      fall: '攻击性和行动力被情感左右，可能因为"不好意思"而不敢争取',
+    },
+    '木星': {
+      domicile: '信念坚定、格局大、运气好。在扩张和成长方面有天然优势',
+      exalt: '善良和同理心被放大，适合教育、医疗、公益等助人行业',
+      detriment: '视野可能过于关注细节而忽略全局，或信念不够坚定容易动摇',
+      fall: '乐观精神受限，容易悲观或过度谨慎。但这也让你更务实',
+    },
+    '土星': {
+      domicile: '自律、有耐心、能承担责任。在需要长期坚持的事业中有绝对优势',
+      exalt: '公正感强，懂得在规则中找到最优解。适合管理、法律、外交',
+      detriment: '责任感与情感需求冲突，可能因为"必须坚强"而压抑自己',
+      fall: '纪律性受冲动影响，可能在需要耐心的时刻选择了捷径',
+    },
+  };
+
+  const planetScene = scenes[planet];
+  if (planetScene?.[status]) {
+    return `${planetScene[status]}。落在第${house}宫，在${houseArea}领域表现尤为明显`;
+  }
+
+  const generic: Record<string, string> = {
+    domicile: `${planet}回到守护星座，在${houseArea}领域能量充分表达，是天赋所在`,
+    exalt: `${planet}能量被放大，在${houseArea}领域表现突出，但需警惕过度`,
+    detriment: `${planet}能量受阻，在${houseArea}领域需要更多努力来发挥`,
+    fall: `${planet}表达不畅，在${houseArea}领域可能力不从心，但可通过觉察转化`,
+  };
+  return generic[status] || '';
+}
+
+// ─── 增强模块：宫主星飞布关键组合 ───
+
+const DISPOSITION_KEY: Record<string, string> = {
+  '1-5': '自我认同在创意、恋爱和自我表达中实现——你需要舞台',
+  '1-7': '自我认同与伴侣关系深度绑定，通过关系认识自己',
+  '1-8': '人生必经深层转化，可能多次"重生"，在危机中找到真正的自己',
+  '1-10': '事业成就是自我价值的核心证明，对社会地位有强烈追求',
+  '1-12': '内在世界极其丰富，需要大量独处和灵性探索来找到自我',
+  '2-5': '财运与创意、投机或娱乐行业相关，可能通过爱好赚钱',
+  '2-7': '财运与伴侣或合伙人密切相关，婚后财务状况可能有较大变化',
+  '2-8': '可能通过共享资源、投资、保险或继承获得财富积累',
+  '2-10': '事业是主要收入来源，职位越高财运越好',
+  '2-11': '朋友圈和社交网络带来财务机会，适合互联网或社群变现',
+  '5-3': '通过日常社交、网络或短途出行遇到恋爱对象，沟通是恋爱核心',
+  '5-7': '恋爱很容易走向婚姻，遇到的人多是认真的类型',
+  '5-9': '跨文化恋爱或在旅行/学习中遇到对象的可能性高',
+  '5-11': '从朋友发展为恋人的概率高，社交圈是桃花主要来源',
+  '5-12': '可能经历暗恋或秘密恋情，感情中有隐藏的一面',
+  '4-10': '家庭和事业之间需要持续平衡，两者是跷跷板关系',
+  '4-12': '原生家庭中有未解的情感议题，心理成长和疗愈是重要功课',
+  '6-8': '日常健康与心理深层状态联动，身心连接紧密',
+  '6-12': '日常工作可能与服务、疗愈或幕后相关',
+  '8-2': '深层转化通过财务变化触发，可能经历财务大起大落',
+  '9-3': '高等智慧与日常沟通结合，适合做知识传播者或教育者',
+  '11-5': '在创意社群中找到归属，社交与创造互相滋养',
+  '12-1': '潜意识和灵性需求影响自我认同，可能有"不属于这个世界"的感觉',
+};
+
+function getRelevantHousesForIntent(intent: string): number[] {
+  const map: Record<string, number[]> = {
+    love: [1, 5, 7, 8],
+    career: [2, 6, 10, 11],
+    health: [1, 6, 8, 12],
+    personality: [1, 4, 5, 9, 12],
+    timing: [1, 7, 10],
+    general: [1, 2, 4, 5, 7, 10],
+  };
+  return map[intent] || map.general;
+}
+
+// ─── 综合叙事 ───
+
+function synthesizeNarrative(insights: string[], planets: Planet[]): string {
+  const themes: string[] = [];
+
+  const relCount = insights.filter(i => /7宫|伴侣|婚姻|感情|恋爱|桃花/.test(i)).length;
+  if (relCount >= 3) themes.push('关系与情感是你人生的核心议题');
+
+  const careerCount = insights.filter(i => /10宫|事业|职业|社会地位/.test(i)).length;
+  if (careerCount >= 3) themes.push('事业成就和社会认可是你的深层驱动力');
+
+  const tensionCount = insights.filter(i => /四分|对冲|T三角|压力|冲突|拉扯/.test(i)).length;
+  if (tensionCount >= 4) themes.push('命盘张力相位多，人生充满推动力但也需要学会管理压力和焦虑');
+  else if (tensionCount <= 1) themes.push('命盘以和谐相位为主，天赋流动顺畅但需要主动制造突破点');
+
+  const spiritCount = insights.filter(i => /12宫|海王星|冥王星|潜意识|灵性|转化|重生/.test(i)).length;
+  if (spiritCount >= 2) themes.push('你有较强的灵性倾向和深层心理觉察力');
+
+  const retroCount = insights.filter(i => /逆行/.test(i)).length;
+  if (retroCount >= 2) themes.push('多颗行星逆行意味着你的成长模式是"向内求"，通过反思和回顾获得智慧');
+
+  if (insights.some(i => /5宫.*创|创意|创造|艺术/.test(i))) themes.push('创造力和自我表达是你人生的重要出口');
+
+  if (themes.length === 0) return '';
+  const selected = themes.slice(0, 3);
+  return `\n## 人生主题综合\n${selected.join('；')}。这些主题互相交织，构成你独特的人生蓝图——了解它们是为了更有意识地活出自己的潜能。`;
 }

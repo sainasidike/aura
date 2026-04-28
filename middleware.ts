@@ -6,7 +6,7 @@ const COOKIE_NAME = 'aura_token';
 
 const PUBLIC_PATHS = ['/login', '/api/auth', '/admin', '/api/admin'];
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip public paths

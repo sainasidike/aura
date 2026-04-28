@@ -93,6 +93,22 @@ const HOUSE_MEANING: Record<number, string> = {
   10: '事业与社会地位', 11: '社交圈与理想', 12: '潜意识、灵性与隐藏',
 };
 
+// 群星格局（Stellium）宫位含义
+const STELLIUM_HOUSE_MEANING: Record<number, string> = {
+  1: '生命能量高度集中在自我表达上——你是一个存在感极强的人，无论走到哪里都很难被忽视。但也意味着容易过度关注自己',
+  2: '大量行星聚集在财务与价值领域——你对金钱和物质安全感有超乎常人的执念，可能一辈子都在解决"值不值得"的问题',
+  3: '生命能量密集投入在沟通与学习中——你的脑子永远在转，话也多，可能同时经营好几个社交圈或信息渠道',
+  4: '家庭和内在安全感是你人生的绝对核心——你可能花大量精力处理原生家庭议题，或者把"建立自己的家"当作人生最大目标',
+  5: '创造力、恋爱、自我表达是你的生命核心——你需要舞台、需要被看到、需要爱。不创作不恋爱你就觉得人生没意义',
+  6: '日常工作和健康管理占据你大量生命能量——你可能是工作狂，也可能反复和身体问题打交道。"把日子过好"对你来说不是小事',
+  7: '生命能量高度集中在一对一关系上——你通过与他人的深度互动来认识自己，单身状态对你来说特别难熬',
+  8: '生命能量高度集中在深层转化、亲密关系和共享资源领域——你的人生注定要经历多次"死亡与重生"，浅层的生活满足不了你。你在信任、控制、亲密、共同财务这些深水区议题上会反复打转，但也因此拥有超越常人的洞察力',
+  9: '高等学习、远方和信仰是你的生命燃料——你需要持续扩展视野，待在一个地方太久就会窒息。可能热衷留学、旅行或宗教哲学',
+  10: '事业是你人生的绝对主旋律——你对社会地位和成就有极强的驱动力，可能很早就知道自己要什么。人生的大部分精力都投入在"往上走"这件事上',
+  11: '社交网络和理想主义占据你大量精力——你在群体中能找到归属感，适合社群运营、公益或科技行业。但小心"为理想牺牲个人生活"',
+  12: '大量行星隐入潜意识领域——你有极强的灵性倾向和直觉力，但也容易感到莫名疲惫或"被看不见的东西消耗"。独处时你才是最真实的自己',
+};
+
 // ─── 洞察提取 ───
 
 export function extractChartInsights(data: Record<string, unknown>, questionIntent?: string): string {
@@ -401,7 +417,8 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     for (const sa of sunAspects) {
       const other = sa.planet1 === '太阳' ? sa.planet2 : sa.planet1;
       const meaning = getAspectMeaning('太阳', other, sa.type);
-      if (meaning) result.sun.push(`太阳${sa.type}${other}（${sa.orb}°）：${meaning}`);
+      const mark = markAspectPriority(sa.type, sa.orb);
+      if (meaning) result.sun.push(`${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`);
     }
   }
 
@@ -440,7 +457,8 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     for (const ma of moonAspects) {
       const other = ma.planet1 === '月亮' ? ma.planet2 : ma.planet1;
       const meaning = getAspectMeaning('月亮', other, ma.type);
-      if (meaning) result.moon.push(`月亮${ma.type}${other}（${ma.orb}°）：${meaning}`);
+      const mark = markAspectPriority(ma.type, ma.orb);
+      if (meaning) result.moon.push(`${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`);
     }
   }
 
@@ -470,6 +488,10 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
   // ── 感情维度 ──
   const venus = planets.find(p => p.name === '金星');
   if (venus) {
+    // 金星星座+宫位基础解读（最重要，放在最前面）
+    const venusBase = getVenusSignHouse(venus.sign, venus.house, venus.degree);
+    if (venusBase) result.love.unshift(venusBase);
+
     const dignity = getDignityStatus(venus);
     if (dignity) result.love.push(dignity);
   }
@@ -484,14 +506,47 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
       }
     }
   }
-  // 金星的相位
+  // 金星的紧密相位（扩展到3条，增加覆盖）
   const venusAspects = aspects.filter(a =>
     (a.planet1 === '金星' || a.planet2 === '金星') && a.orb <= 3
-  ).sort((a, b) => a.orb - b.orb).slice(0, 2);
+  ).sort((a, b) => a.orb - b.orb).slice(0, 3);
+  const loveAspectKeys = new Set<string>(); // 记录已输出的相位，防重复
   for (const va of venusAspects) {
     const other = va.planet1 === '金星' ? va.planet2 : va.planet1;
     const meaning = getAspectMeaning('金星', other, va.type);
-    if (meaning) result.love.push(`金星${va.type}${other}（${va.orb}°）：${meaning}`);
+    const mark = markAspectPriority(va.type, va.orb);
+    if (meaning) {
+      result.love.push(`${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`);
+      loveAspectKeys.add(`金星+${other}`);
+      loveAspectKeys.add(`${other}+金星`);
+    }
+  }
+  // 月亮/火星的感情相关紧密相位补充
+  const loveSupplementPlanets = ['月亮', '火星'];
+  for (const pName of loveSupplementPlanets) {
+    const supplementAspects = aspects.filter(a => {
+      if (a.orb > 3) return false;
+      const involves = a.planet1 === pName || a.planet2 === pName;
+      if (!involves) return false;
+      const other = a.planet1 === pName ? a.planet2 : a.planet1;
+      // 只要与金星/月亮/火星的相位（感情相关）
+      if (!['金星', '月亮', '火星'].includes(other)) return false;
+      // 排除已输出的
+      const key = `${a.planet1}+${a.planet2}`;
+      const keyR = `${a.planet2}+${a.planet1}`;
+      return !loveAspectKeys.has(key) && !loveAspectKeys.has(keyR);
+    }).sort((a, b) => a.orb - b.orb).slice(0, 1);
+    for (const sa of supplementAspects) {
+      const p1 = sa.planet1;
+      const p2 = sa.planet2;
+      const meaning = getAspectMeaning(p1, p2, sa.type);
+      const mark = markAspectPriority(sa.type, sa.orb);
+      if (meaning) {
+        result.love.push(`${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${meaning}`);
+        loveAspectKeys.add(`${p1}+${p2}`);
+        loveAspectKeys.add(`${p2}+${p1}`);
+      }
+    }
   }
 
   // ── 事业维度 ──
@@ -510,6 +565,9 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
   if (saturn) {
     const dignity = getDignityStatus(saturn);
     if (dignity) result.career.push(dignity);
+    // 土星宫位对事业的影响
+    const saturnCareer = getSaturnCareerHouse(saturn.house);
+    if (saturnCareer) result.career.push(`土星落第${saturn.house}宫对事业的影响：${saturnCareer}`);
   }
 
   // ── 格局 → summary ──
@@ -521,6 +579,37 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
   for (const gt of grandTrines) {
     const elem = getElement(gt.element);
     result.summary.push(`大三角格局（${elem}象）：${gt.planets.join('、')}形成天赋闭环。在${ELEMENT_TALENT[elem]}方面有过人天赋。`);
+  }
+
+  // ── 群星格局（Stellium）检测 ──
+  const stelliumHouseCounts: Record<number, Planet[]> = {};
+  for (const p of planets) {
+    if (p.name === '北交点') continue;
+    if (!stelliumHouseCounts[p.house]) stelliumHouseCounts[p.house] = [];
+    stelliumHouseCounts[p.house].push(p);
+  }
+  for (const [h, ps] of Object.entries(stelliumHouseCounts)) {
+    if (ps.length >= 3) {
+      const hn = Number(h);
+      const personalCount = ps.filter(p => PERSONAL_PLANETS.includes(p.name)).length;
+      const isCore = personalCount >= 2;
+      const planetNames = ps.map(p => p.name).join('+');
+      const signNames = [...new Set(ps.map(p => p.sign))].join('/');
+      const stelliumMeaning = STELLIUM_HOUSE_MEANING[hn] || `大量生命能量集中在第${hn}宫（${HOUSE_MEANING[hn] || ''}）`;
+      const prefix = isCore ? `【${hn}宫核心群星】` : `【${hn}宫群星】`;
+      const insight = `${prefix}${planetNames}同落${signNames}座第${hn}宫——${stelliumMeaning}`;
+
+      // 注入到对应维度
+      if (hn === 8 || hn === 7 || hn === 5) {
+        result.love.push(insight);
+        result.summary.push(insight);
+      } else if (hn === 10 || hn === 6 || hn === 2) {
+        result.career.push(insight);
+        result.summary.push(insight);
+      } else {
+        result.summary.push(insight);
+      }
+    }
   }
 
   // 南北交点 → summary
@@ -579,6 +668,14 @@ function sortInsightsByIntent(insights: string[], intent: string): string[] {
     else normal.push(ins);
   }
   return [...high, ...normal];
+}
+
+/** 标记相位优先级 */
+function markAspectPriority(type: string, orb: number): string {
+  const isHard = type === '四分' || type === '对冲';
+  if (isHard && orb <= 2.5) return '【核心挑战】';
+  if (!isHard && orb <= 1.5) return '【核心天赋】';
+  return '';
 }
 
 // ─── 辅助函数 ───
@@ -813,6 +910,24 @@ function getH10Insight(house: number): string {
   return m[house] || '';
 }
 
+function getSaturnCareerHouse(house: number): string {
+  const m: Record<number, string> = {
+    1: '你自带严肃靠谱的气场，适合需要权威感的职业——管理者、导师、独立专家。职场起步慢但越走越稳',
+    2: '对财务安全感要求极高，适合财务管理、审计、投资等需要谨慎精确的领域。不适合赌博式创业',
+    3: '沟通风格严谨务实，适合学术写作、法律文书、合同审核等需要精确表达的工作。会议发言少但句句有分量',
+    4: '事业根基与家庭深度绑定，可能继承家族事业或在房地产、养老产业发展。工作环境需要有"归属感"',
+    5: '创造力需要纪律来释放——你不是天马行空型的创作者，而是"手艺人"型：反复打磨、精益求精。适合需要长期修炼的艺术或技术领域',
+    6: '日常工作是你最大的修炼场——流程管理、质量控制、医疗健康领域都适合。你是团队里最让人放心的执行者',
+    7: '合作关系中你是更成熟稳重的那一方，适合律师、咨询师、谈判专家等需要建立长期信任的职业',
+    8: '适合处理复杂资源整合的工作——风险管理、心理咨询、遗产规划、深度研究。你在别人恐惧的领域反而沉稳',
+    9: '适合学术研究、高等教育、跨文化管理等需要深度知识积累的领域。可能在海外或国际组织中发展',
+    10: '天生管理者，事业心极强且有长期规划。你的事业巅峰来得晚但来得扎实，40岁后是黄金期',
+    11: '适合在大型组织或社会机构中发挥作用——科技公司、NGO、行业协会。你是那种"在幕后推动系统运转"的人',
+    12: '适合幕后工作——研究、写作、心理咨询、灵性教导、医疗机构管理。独处中工作效率最高，需要安静不被打扰的环境',
+  };
+  return m[house] || '';
+}
+
 // ─── 增强模块：逆行 + 宫位组合 ───
 
 const RETRO_HOUSE_CONTEXT: Record<string, Record<number, string>> = {
@@ -896,6 +1011,23 @@ function getTSquareDetail(apex: string, apexHouse: number, base1: string, base2:
   return `T三角格局：${apex}（顶点，第${apexHouse}宫）与${base1}、${base2}形成强张力三角。${detail}。这股压力集中在第${apexHouse}宫（${houseArea}）——这里是你人生最大的挑战，也是突破后收获最大的地方。${base1}和${base2}的对冲是压力源头，${apex}是你被迫面对和解决问题的出口。`;
 }
 
+// ─── 土星入庙宫位特殊解读 ───
+
+const SATURN_DOMICILE_HOUSE: Record<number, string> = {
+  1: '极强的自律写在脸上——别人觉得你严肃靠谱有距离感，你是自己最严厉的评判者。凡事先苛责自己再要求别人',
+  2: '对财务有超乎常人的自律——不会冲动消费，懂得延迟满足。你的存款数字是你安全感的基石',
+  3: '说话做事极其严谨，一字一句都经过深思。你可能是朋友圈里最少发言但最有分量的那个人',
+  4: '对家庭有极强的责任感，可能从小就承担了超出年龄的家庭义务。你的"家"可能不温馨但绝对稳固',
+  5: '创造力在纪律中释放——你不是即兴型创作者，而是反复打磨的手艺人。恋爱也是认真谨慎型',
+  6: '天生的工作狂且执行力极强——流程管理、质量控制是你的天赋。但容易把自己逼太紧，忽视休息',
+  7: '对伴侣关系极其认真——要么不开始，开始了就奔着长久。可能晚婚或经过慎重考虑才进入关系',
+  8: '面对危机和深层议题时异常冷静——别人慌的时候你反而沉着。适合处理遗产、保险、心理深层议题',
+  9: '信念体系极其稳固，学术研究有耐心。可能在高等教育或跨文化领域承担长期责任',
+  10: '天生管理者，事业心极强且有长期规划。你的事业巅峰来得晚但来得扎实，是最典型的"大器晚成"配置',
+  11: '在社群中承担组织者和规则制定者的角色。你的社交不是为了热闹，而是为了推动有意义的集体目标',
+  12: '你的自律和责任感在幕后默默运作——能在孤独中坚持常人无法坚持的事。适合研究、写作、冥想修行、幕后管理等需要长期独处的深度工作。你可能承担了很多看不见的责任，这些付出很少被人看到但你从不抱怨。警惕：独自扛太多会消耗你，学会让信任的人分担',
+};
+
 // ─── 增强模块：行星尊贵场景化 ───
 
 function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detriment' | 'fall', house: number): string {
@@ -906,13 +1038,13 @@ function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detrime
       domicile: '自信而耀眼，像回到了自己的王国。在人群中自然成为焦点，领导力和创造力浑然天成',
       exalt: '意志力和生命力被放大，精力充沛、行动果断，但也可能过于强势或独断',
       detriment: '自我意识受群体压力制约，可能为了"合群"压抑真实想法。需要在保持个性和融入集体之间找平衡',
-      fall: '自信心容易受外界评价影响，做决定时总在权衡利弊而犹豫。但这也让你比别人更懂得倾听',
+      fall: '自信心容易受外界评价影响，做决定时总在权衡利弊而犹豫不决——别人一句"你确定吗？"就能动摇你刚下的决心。在需要拍板的时刻容易把选择权交给别人。成长方向："不完美的决定也比不做决定强"',
     },
     '月亮': {
       domicile: '情感表达自然流畅，直觉准确，共情能力强。在家庭和亲密关系中如鱼得水',
       exalt: '情感需求与物质安全感结合良好，内心踏实稳定，但可能过于依赖舒适区',
       detriment: '情感表达被"应该坚强"的信念压制，不容易示弱但内心渴望被照顾。表达脆弱是重要课题',
-      fall: '情绪容易被深层恐惧和猜疑所困，对亲密关系既渴望又恐惧。但拥有惊人的情感洞察力',
+      fall: '情绪容易被深层恐惧和猜疑所困，对亲密关系既渴望又恐惧——可能在伴侣没回消息时反复检查手机，在关系升温时主动制造距离。成长方向：觉察"我在推开我真正想要的东西"',
     },
     '水星': {
       domicile: '思维敏捷、表达能力强，学什么都快，沟通能力是天赋',
@@ -929,7 +1061,7 @@ function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detrime
     '火星': {
       domicile: '行动力强、决断果敢、竞争力十足。天生的战士，适合需要冲劲的领域',
       exalt: '行动力与战略思维结合，执行力强且有耐心等待最佳时机',
-      detriment: '行动力被犹豫不决拖慢，可能在该出手时错失良机。但学会了在行动前三思',
+      detriment: '行动力被犹豫不决拖慢——机会来了还在列利弊清单，等分析完机会已经没了。在竞争场景中容易"礼让"到吃亏。成长方向：给自己设deadline——超过3分钟没决定就选第一直觉',
       fall: '攻击性和行动力被情感左右，可能因为"不好意思"而不敢争取',
     },
     '木星': {
@@ -948,6 +1080,10 @@ function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detrime
 
   const planetScene = scenes[planet];
   if (planetScene?.[status]) {
+    // 土星入庙：优先使用宫位特殊解读
+    if (planet === '土星' && status === 'domicile' && SATURN_DOMICILE_HOUSE[house]) {
+      return SATURN_DOMICILE_HOUSE[house];
+    }
     return `${planetScene[status]}。落在第${house}宫，在${houseArea}领域表现尤为明显`;
   }
 
@@ -1120,6 +1256,48 @@ export function getMoonSignHouse(sign: string, house: number): string {
   const houseScene = HOUSE_SCENE[house] || '';
   if (!moonTrait) return '';
   return `月亮${sign}的情感模式：${moonTrait} 落在第${house}宫，${houseScene}`;
+}
+
+/** 金星星座+宫位组合解读 */
+export function getVenusSignHouse(sign: string, house: number, degree: number): string {
+  const VENUS_SIGN: Record<string, string> = {
+    '白羊': '爱上一个人就像冲锋——直接、热烈、不绕弯子。你追人的方式是"我喜欢你所以我行动"，等待和暧昧让你抓狂。但热得快凉得也快，挑战消失了你就容易无聊',
+    '金牛': '你在感情中追求"确定性"——一旦认定就不轻易放手，用实际行动而非甜言蜜语表达爱。你的爱是稳定的、感官的、物质的——一起吃顿好的比说一百句"我爱你"更让你心安',
+    '双子': '你被"有趣"吸引——聊得来比长得好看重要。你需要一个能陪你聊天、互相斗嘴、永远有新话题的伴侣。但你的兴趣转移太快，可能在不同人之间摇摆',
+    '巨蟹': '你在感情中像妈妈一样照顾人——做饭、嘘寒问暖、记住对方所有小习惯。你需要"家"的感觉才能安心，对方如果情感回应不够你会受伤但不说',
+    '狮子': '你在感情中需要被崇拜——对方如果夸你、宠你、让你觉得自己是最特别的，你什么都愿意给。但如果你觉得自己被忽视了，你会用冷淡来惩罚对方',
+    '处女': '你的爱藏在细节里——帮对方整理房间、提醒吃药、优化行程安排。你不擅长说甜言蜜语，但你的照顾比任何情话都实在。选人标准偏高，容易挑剔对方的小毛病',
+    '天秤': '天生的恋爱高手——懂得经营关系、注重仪式感、追求精神契合。选人标准里"谈吐"和"审美"排在前面。但容易为了维持关系的"体面"而压抑真实感受',
+    '天蝎': '爱上一个人就要全部——不接受暧昧、不接受三心二意。你的爱是滚烫的、占有的、深入骨髓的。感情中对"忠诚"和"真实"有近乎偏执的要求',
+    '射手': '你把恋爱当冒险——喜欢有距离感的、神秘的、和你不一样的人。自由是你的底线，谁想管你谁就会失去你。你的爱情里需要有成长和探索',
+    '摩羯': '你对感情极其认真——不轻易开始，开始了就奔着长久。可能晚熟或者经历过早年的感情挫折后变得谨慎。你的爱不是热烈的而是持久的',
+    '水瓶': '你在感情中需要大量个人空间——"黏"是你最不能忍受的。你被独特的、有想法的、不走寻常路的人吸引。传统的恋爱模式让你窒息',
+    '双鱼': '你是最浪漫的金星位置——爱上一个人就愿意为对方牺牲一切。你容易理想化伴侣，把对方想象成完美的样子，然后在现实面前失望。但你给出的爱是纯粹到近乎神圣的',
+  };
+
+  const VENUS_SPECIAL: Record<string, string> = {
+    '天秤-7': '你是最典型的"为爱而生"配置——对关系有天然的平衡感和审美，懂得怎么让两个人都舒服。约会时你永远知道选什么餐厅、穿什么衣服、说什么话。但你太在乎"好看不好看"了，可能为了维持关系的优雅而回避真正的冲突',
+    '天秤-8': '你在感情中的魅力不是社交场合的开朗，而是越深入越让人着迷。你在一对一的深层交流中散发的吸引力远超社交场合。但8宫金星意味着你的爱情模式离不开"权力、信任、共享资源"这些深水区议题',
+    '天蝎-8': '爱到极致——你的感情里没有灰色地带，要么全部要么什么都不要。你能看穿伴侣的每一个谎言和伪装，这种洞察力既是武器也是诅咒',
+    '双鱼-12': '爱情对你来说是一种灵性体验——你可能在梦里爱上一个人，或者对从未见面的人产生强烈的连接感。现实中的感情容易让你失望，因为没有人能达到你内心那个理想的高度',
+    '金牛-2': '你的爱情和金钱安全感深度绑定——在经济稳定时感情也稳定，缺钱时一切关系都会受影响。你用物质方式表达爱（送礼物、做好吃的、提供舒适的环境），也需要对方用同样的方式回应',
+    '狮子-5': '你在恋爱中自带聚光灯——热烈、大方、想让全世界知道你在恋爱。你需要一个让你骄傲的伴侣，约会就是你的舞台',
+    '天蝎-7': '对伴侣关系有极其深刻的需求——你不要肤浅的陪伴，要的是灵魂级别的连接。选伴侣的标准是"能不能看到我最阴暗的一面还不跑"',
+    '摩羯-10': '感情和事业交织——你可能被有权力、有地位、年长的人吸引，或者在职场环境中遇到伴侣。你对感情的态度像对事业一样认真',
+    '双鱼-7': '你在感情中有救世主情结——总是被"需要被拯救"的人吸引。你的理想伴侣带着艺术气质或灵性气质，但现实中你需要学会区分"爱"和"同情"',
+    '白羊-1': '你在感情中极具侵略性的魅力——看上谁就直接表白，不喜欢暧昧和猜测。你的吸引力来自你的果断和自信',
+    '巨蟹-4': '你把恋爱当回家——需要家庭般的温暖和安全感。你可能很早就想和伴侣同居或结婚，"有个家"是你在感情中的终极目标',
+    '射手-9': '你的爱情充满异域风情——可能和外国人恋爱，或者在旅途中遇到命中注定的人。你需要一个能和你一起探索世界的伴侣',
+  };
+
+  const venusTrait = VENUS_SIGN[sign] || '';
+  if (!venusTrait) return '';
+
+  const key = `${sign}-${house}`;
+  if (VENUS_SPECIAL[key]) return `金星${sign}${degree}°第${house}宫：${VENUS_SPECIAL[key]}`;
+
+  const houseScene = HOUSE_SCENE[house] || '';
+  return `金星${sign}${degree}°第${house}宫——爱情风格：${venusTrait} 在感情中，这种特质${houseScene}`;
 }
 
 /** 上升星座场景化解读 */

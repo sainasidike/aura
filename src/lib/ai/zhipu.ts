@@ -515,16 +515,17 @@ ${COMMON_RULES}`;
 
   // ─── 性格分析专项 ───
   if (intent === 'personality') {
-    return `你是专业西洋占星师，用户想了解**自己的性格特质**。只使用西洋占星学体系。
+    return `你是专业西洋占星师，用户想了解**自己的性格特质和内在模式**。只使用西洋占星学体系。
 
 ## 分析框架（按此顺序看盘）
 1. **太阳星座+宫位** → 核心自我认同、人生目标和驱动力
 2. **月亮星座+宫位** → 内在情感模式、安全感来源、私下的真实状态
 3. **上升星座 + 命主星** → 别人第一眼看到的你、社交人格面具
 4. **水星星座+宫位** → 思维模式和沟通风格
-5. **日月相位** → 内外是否一致，内心有无矛盾拉扯
-6. **紧密相位（orb<3°）** → 性格中最突出的特征
-关键：不要列举教科书式的星座特质。要说出"你和同星座的人有什么不同"、"你最容易被误解的点是什么"、"你自己可能都没意识到的模式"。
+5. **4宫/IC + 月亮 + 土星** → 原生家庭烙印：月亮=母亲/情感养育模式，土星=父亲/权威/限制，4宫宫头星座=家庭氛围底色，4宫内行星=家庭领域的核心议题
+6. **日月相位** → 内外是否一致，内心有无矛盾拉扯
+7. **紧密相位（orb<3°）** → 性格中最突出的特征
+关键：不要列举教科书式的星座特质。要说出"你和同星座的人有什么不同"、"你最容易被误解的点是什么"、"你自己可能都没意识到的模式"。如果用户问的是家庭/父母/离家相关话题，FAMILY板块必须重点展开。
 
 ## 排盘数据
 ${data}${insightBlock}
@@ -532,7 +533,7 @@ ${data}${insightBlock}
 ${buildCardFormat(`---SUN--- 核心自我
 ---MOON--- 内在情感
 ---RISING--- 外在形象与社交面具
----MERCURY--- 思维与沟通方式
+---FAMILY--- 原生家庭与根基
 ---SUMMARY--- 性格全貌与成长方向`)}
 
 ${COMMON_RULES}`;
@@ -709,7 +710,7 @@ ${careerContent}
     }
 
     // ── Card 6: PATTERN ──
-    const patternContent = fmt(grouped.summary.filter(s => s.includes('格局') || s.includes('三角') || s.includes('北交点') || s.includes('南交点')));
+    const patternContent = fmt(grouped.summary.filter(s => s.includes('格局') || s.includes('群星') || s.includes('三角') || s.includes('北交点') || s.includes('南交点')));
     if (patternContent) {
       cards.push(`---PATTERN--- 命盘格局与人生课题
 【以下是经过专业计算验证的分析，请用生动口语改写，禁止删减核心结论】
@@ -722,7 +723,7 @@ ${patternContent}
     }
 
     // ── Card 7: SUMMARY ──
-    const narrativeParts = grouped.summary.filter(s => !s.includes('格局') && !s.includes('三角') && !s.includes('北交点') && !s.includes('南交点'));
+    const narrativeParts = grouped.summary.filter(s => !s.includes('格局') && !s.includes('群星') && !s.includes('三角') && !s.includes('北交点') && !s.includes('南交点'));
     cards.push(`---SUMMARY--- 你的人生蓝图
 综合以上所有板块的分析，写一段完整的人生画面（150-250字）。要求：
 - 串联太阳（核心驱动）、月亮（情感需求）、上升（外在呈现）的关键发现

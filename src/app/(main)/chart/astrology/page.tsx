@@ -11,6 +11,8 @@ import type { AstrologyChart } from '@/types';
 const CHART_TYPES = [
   { key: 'natal', label: '本命' },
   { key: 'transit', label: '行运' },
+  { key: 'progression', label: '次限' },
+  { key: 'tertiary', label: '三限' },
   { key: 'solar_return', label: '日返' },
   { key: 'lunar_return', label: '月返' },
 ] as const;
@@ -18,6 +20,8 @@ const CHART_TYPES = [
 const AI_QUESTIONS: Record<string, string> = {
   natal: '请帮我全面解读我的本命盘',
   transit: '我最近的运势如何？',
+  progression: '请帮我解读当前次限盘的影响',
+  tertiary: '请帮我解读当前三限盘的影响',
   solar_return: '我今年的年运如何？',
   lunar_return: '我这个月的运势如何？',
 };
@@ -44,6 +48,17 @@ interface ReturnData {
   nextReturn?: { date: string; time: string } | null;
   chart: AstrologyChart;
   natalChart: AstrologyChart;
+}
+
+interface ProgressionData {
+  type: string;
+  typeCn: string;
+  progressedDate: string;
+  targetDate: string;
+  ageYears: number;
+  chart: AstrologyChart;
+  natalChart: AstrologyChart;
+  crossAspects: { planet1: string; planet2: string; type: string; angle: number; orb: number }[];
 }
 
 /* ─── helpers ─── */
@@ -183,6 +198,18 @@ function AstrologyContent() {
   const [transitHour, setTransitHour] = useState(cstNowHour);
   const [transitMinute, setTransitMinute] = useState(cstNowMinute);
 
+  // Progression state (次限/三限)
+  const [progressionData, setProgressionData] = useState<ProgressionData | null>(null);
+  const [progressionLoading, setProgressionLoading] = useState(false);
+  const [progDate, setProgDate] = useState(cstToday);
+  const [progHour, setProgHour] = useState(cstNowHour);
+  const [progMinute, setProgMinute] = useState(cstNowMinute);
+  const [tertiaryData, setTertiaryData] = useState<ProgressionData | null>(null);
+  const [tertiaryLoading, setTertiaryLoading] = useState(false);
+  const [tertiaryDate, setTertiaryDate] = useState(cstToday);
+  const [tertiaryHourVal, setTertiaryHourVal] = useState(cstNowHour);
+  const [tertiaryMinuteVal, setTertiaryMinuteVal] = useState(cstNowMinute);
+
   // Return chart state
   const [returnData, setReturnData] = useState<ReturnData | null>(null);
   const [returnLoading, setReturnLoading] = useState(false);
@@ -313,19 +340,55 @@ function AstrologyContent() {
       .finally(() => setReturnLoading(false));
   }, [profile, solarDate, lunarDate, lunarHour, lunarMinute]);
 
+  // Fetch progression chart (次限 or 三限)
+  const fetchProgression = useCallback((type: 'progression' | 'tertiary') => {
+    if (!profile) return;
+    const isProg = type === 'progression';
+    const setData = isProg ? setProgressionData : setTertiaryData;
+    const setLoading = isProg ? setProgressionLoading : setTertiaryLoading;
+    const date = isProg ? progDate : tertiaryDate;
+    const hour = isProg ? progHour : tertiaryHourVal;
+    const minute = isProg ? progMinute : tertiaryMinuteVal;
+
+    setLoading(true);
+    setError('');
+    const endpoint = isProg ? '/api/astrology/progression' : '/api/astrology/tertiary';
+    const [y, m, d] = date.split('-').map(Number);
+    const utc = new Date(Date.UTC(y, m - 1, d, hour - 8, minute));
+
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        year: profile.year, month: profile.month, day: profile.day,
+        hour: profile.hour, minute: profile.minute,
+        longitude: profile.longitude, latitude: profile.latitude, timezone: profile.timezone,
+        targetDate: utc.toISOString(),
+      }),
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => { if (!ok) throw new Error(data.error); setData(data); })
+      .catch(e => setError(e instanceof Error ? e.message : `${isProg ? '次限' : '三限'}计算失败`))
+      .finally(() => setLoading(false));
+  }, [profile, progDate, progHour, progMinute, tertiaryDate, tertiaryHourVal, tertiaryMinuteVal]);
+
   // Auto-fetch when chart type changes
   useEffect(() => {
     if (!profile) return;
     setError('');
     if (chartType === 'transit') fetchTransit();
+    if (chartType === 'progression') fetchProgression('progression');
+    if (chartType === 'tertiary') fetchProgression('tertiary');
     if (chartType === 'solar_return') fetchReturn('solar_return');
     if (chartType === 'lunar_return') fetchReturn('lunar_return');
   }, [chartType, profile]);
 
-  // Reset return data when switching chart type
+  // Reset data when switching chart type
   useEffect(() => {
     setReturnData(null);
     setTransitData(null);
+    setProgressionData(null);
+    setTertiaryData(null);
   }, [chartType]);
 
   // Debounced auto-recalculate on value changes
@@ -354,6 +417,18 @@ function AstrologyContent() {
     return () => clearTimeout(t);
   }, [lunarDate, lunarHour, lunarMinute]);
 
+  useEffect(() => {
+    if (!profile || chartType !== 'progression') return;
+    const t = setTimeout(() => fetchProgression('progression'), 400);
+    return () => clearTimeout(t);
+  }, [progDate, progHour, progMinute]);
+
+  useEffect(() => {
+    if (!profile || chartType !== 'tertiary') return;
+    const t = setTimeout(() => fetchProgression('tertiary'), 400);
+    return () => clearTimeout(t);
+  }, [tertiaryDate, tertiaryHourVal, tertiaryMinuteVal]);
+
   /* ─── Ask AI: build chart data & navigate to chat ─── */
   const handleAskAI = () => {
     if (!profile) return;
@@ -379,6 +454,26 @@ function AstrologyContent() {
         transitChart: transitData.transitChart,
         crossAspects: transitData.crossAspects,
         transitTime: new Date(transitData.transitTime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+      };
+    } else if (chartType === 'progression' && progressionData) {
+      analysisType = 'progression';
+      chartData = {
+        profile: profileInfo,
+        natalChart: progressionData.natalChart,
+        progressedChart: progressionData.chart,
+        crossAspects: progressionData.crossAspects,
+        progressedDate: progressionData.progressedDate,
+        ageYears: progressionData.ageYears,
+      };
+    } else if (chartType === 'tertiary' && tertiaryData) {
+      analysisType = 'tertiary';
+      chartData = {
+        profile: profileInfo,
+        natalChart: tertiaryData.natalChart,
+        progressedChart: tertiaryData.chart,
+        crossAspects: tertiaryData.crossAspects,
+        progressedDate: tertiaryData.progressedDate,
+        ageYears: tertiaryData.ageYears,
       };
     } else if (chartType === 'solar_return' && returnData) {
       analysisType = 'solar_return';
@@ -426,13 +521,17 @@ function AstrologyContent() {
     );
   }
 
-  const isLoading = loading || transitLoading || returnLoading;
+  const isLoading = loading || transitLoading || returnLoading || progressionLoading || tertiaryLoading;
   const currentChart = chartType === 'transit' ? transitData?.transitChart
+    : chartType === 'progression' ? progressionData?.chart
+    : chartType === 'tertiary' ? tertiaryData?.chart
     : (chartType === 'solar_return' || chartType === 'lunar_return') ? returnData?.chart
     : natalData?.chart;
 
   const canAskAI = (chartType === 'natal' && !!natalData)
     || (chartType === 'transit' && !!transitData && !!natalData)
+    || (chartType === 'progression' && !!progressionData)
+    || (chartType === 'tertiary' && !!tertiaryData)
     || ((chartType === 'solar_return' || chartType === 'lunar_return') && !!returnData);
 
   return (
@@ -495,6 +594,36 @@ function AstrologyContent() {
           </div>
         )}
 
+        {chartType === 'progression' && (
+          <div className="mb-3 flex items-center justify-center gap-0.5">
+            <SwipeDate value={progDate} onChange={setProgDate} />
+            <span className="text-[10px] mx-1 opacity-30" style={{ color: 'var(--text-quaternary)' }}>·</span>
+            <SwipeNum value={progHour} onChange={setProgHour} min={0} max={23} pad={2} />
+            <span className="text-[11px] -mx-0.5" style={{ color: 'var(--text-quaternary)' }}>:</span>
+            <SwipeNum value={progMinute} onChange={setProgMinute} min={0} max={59} pad={2} />
+            <button
+              onClick={() => { setProgDate(cstToday()); setProgHour(cstNowHour()); setProgMinute(cstNowMinute()); }}
+              className="ml-2 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors"
+              style={{ color: 'var(--accent-secondary)', background: 'rgba(58,191,182,0.06)' }}
+            >此刻</button>
+          </div>
+        )}
+
+        {chartType === 'tertiary' && (
+          <div className="mb-3 flex items-center justify-center gap-0.5">
+            <SwipeDate value={tertiaryDate} onChange={setTertiaryDate} />
+            <span className="text-[10px] mx-1 opacity-30" style={{ color: 'var(--text-quaternary)' }}>·</span>
+            <SwipeNum value={tertiaryHourVal} onChange={setTertiaryHourVal} min={0} max={23} pad={2} />
+            <span className="text-[11px] -mx-0.5" style={{ color: 'var(--text-quaternary)' }}>:</span>
+            <SwipeNum value={tertiaryMinuteVal} onChange={setTertiaryMinuteVal} min={0} max={59} pad={2} />
+            <button
+              onClick={() => { setTertiaryDate(cstToday()); setTertiaryHourVal(cstNowHour()); setTertiaryMinuteVal(cstNowMinute()); }}
+              className="ml-2 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors"
+              style={{ color: 'var(--accent-secondary)', background: 'rgba(58,191,182,0.06)' }}
+            >此刻</button>
+          </div>
+        )}
+
         {chartType === 'solar_return' && (
           <div className="mb-3 flex items-center justify-center gap-0.5">
             <SwipeDate value={solarDate} onChange={setSolarDate} />
@@ -541,6 +670,22 @@ function AstrologyContent() {
           </div>
         )}
 
+        {/* Progression date label */}
+        {chartType === 'progression' && progressionData && (
+          <div className="mb-3 rounded-lg px-3 py-1.5 text-center text-xs font-medium"
+            style={{ background: 'rgba(123,108,184,0.08)', color: 'var(--accent-primary)', border: '1px solid rgba(123,108,184,0.12)' }}>
+            次限盘 — 推运日期 {new Date(progressionData.progressedDate).toLocaleDateString('zh-CN')}（{progressionData.ageYears} 岁）
+          </div>
+        )}
+
+        {/* Tertiary date label */}
+        {chartType === 'tertiary' && tertiaryData && (
+          <div className="mb-3 rounded-lg px-3 py-1.5 text-center text-xs font-medium"
+            style={{ background: 'rgba(123,108,184,0.08)', color: 'var(--accent-primary)', border: '1px solid rgba(123,108,184,0.12)' }}>
+            三限盘 — 推运日期 {new Date(tertiaryData.progressedDate).toLocaleDateString('zh-CN')}（{tertiaryData.ageYears} 岁）
+          </div>
+        )}
+
         {/* ═══ Ask AI Button ═══ */}
         {canAskAI && !isLoading && (
           <button
@@ -560,7 +705,7 @@ function AstrologyContent() {
         {/* Loading */}
         {isLoading && (
           <div className="text-center py-12" style={{ color: 'var(--text-tertiary)' }}>
-            {returnLoading ? '正在计算回归盘...' : transitLoading ? '正在计算行运盘...' : '计算中...'}
+            {returnLoading ? '正在计算回归盘...' : transitLoading ? '正在计算行运盘...' : progressionLoading ? '正在计算次限盘...' : tertiaryLoading ? '正在计算三限盘...' : '计算中...'}
           </div>
         )}
 
@@ -587,6 +732,23 @@ function AstrologyContent() {
                 <TransitOverlaySVG natalChart={natalData.chart} transitChart={transitData.transitChart} />
                 <TransitAspectsList crossAspects={transitData.crossAspects} transitChart={transitData.transitChart} />
                 <ParamsDisplay chart={transitData.transitChart} />
+              </>
+            )}
+
+            {/* Progression / Tertiary: overlay → cross aspects → params */}
+            {chartType === 'progression' && progressionData && natalData && (
+              <>
+                <TransitOverlaySVG natalChart={natalData.chart} transitChart={progressionData.chart} />
+                <TransitAspectsList crossAspects={progressionData.crossAspects} transitChart={progressionData.chart} />
+                <ParamsDisplay chart={progressionData.chart} />
+              </>
+            )}
+
+            {chartType === 'tertiary' && tertiaryData && natalData && (
+              <>
+                <TransitOverlaySVG natalChart={natalData.chart} transitChart={tertiaryData.chart} />
+                <TransitAspectsList crossAspects={tertiaryData.crossAspects} transitChart={tertiaryData.chart} />
+                <ParamsDisplay chart={tertiaryData.chart} />
               </>
             )}
 

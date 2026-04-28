@@ -705,3 +705,59 @@ export function calculateOverlay(
     midheaven: chartB.midheaven,
   };
 }
+
+/* ═══════════════════════════════════════ */
+/* 次限盘 (Secondary Progressions)         */
+/* "一天等于一年"                           */
+/* ═══════════════════════════════════════ */
+
+export function calculateProgression(
+  birthUtc: Date,
+  targetDate: Date,
+  latitude: number,
+  longitude: number,
+): { progressedDate: Date; chart: AstrologyChart; natalChart: AstrologyChart; crossAspects: Aspect[] } {
+  const MS_PER_DAY = 86400000;
+  const DAYS_PER_YEAR = 365.25;
+
+  // 用户活了多少天
+  const ageDays = (targetDate.getTime() - birthUtc.getTime()) / MS_PER_DAY;
+
+  // 次限日期 = 出生时刻 + (ageDays / 365.25) 天
+  const progressedDays = ageDays / DAYS_PER_YEAR;
+  const progressedDate = new Date(birthUtc.getTime() + progressedDays * MS_PER_DAY);
+
+  const chart = calculateChartFromDate(progressedDate, latitude, longitude);
+  const natalChart = calculateChartFromDate(birthUtc, latitude, longitude);
+  const crossAspects = calculateCrossAspects(natalChart.planets, chart.planets);
+
+  return { progressedDate, chart, natalChart, crossAspects };
+}
+
+/* ═══════════════════════════════════════ */
+/* 三限盘 (Tertiary Progressions)          */
+/* "一天等于一个朔望月"                     */
+/* ═══════════════════════════════════════ */
+
+export function calculateTertiaryProgression(
+  birthUtc: Date,
+  targetDate: Date,
+  latitude: number,
+  longitude: number,
+): { progressedDate: Date; chart: AstrologyChart; natalChart: AstrologyChart; crossAspects: Aspect[] } {
+  const MS_PER_DAY = 86400000;
+  const SYNODIC_MONTH = 29.53059; // 一个朔望月的天数
+
+  // 用户活了多少天
+  const ageDays = (targetDate.getTime() - birthUtc.getTime()) / MS_PER_DAY;
+
+  // 三限日期 = 出生时刻 + (ageDays / 29.53059) 天
+  const progressedDays = ageDays / SYNODIC_MONTH;
+  const progressedDate = new Date(birthUtc.getTime() + progressedDays * MS_PER_DAY);
+
+  const chart = calculateChartFromDate(progressedDate, latitude, longitude);
+  const natalChart = calculateChartFromDate(birthUtc, latitude, longitude);
+  const crossAspects = calculateCrossAspects(natalChart.planets, chart.planets);
+
+  return { progressedDate, chart, natalChart, crossAspects };
+}

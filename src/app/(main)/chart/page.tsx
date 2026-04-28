@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 const CHART_TOOLS = [
   { href: '/chart/astrology', icon: '☉', iconBg: 'linear-gradient(135deg, #e8838318, #e8838308)', iconColor: '#d06060', title: '专业星盘', desc: '20+ 种星盘排盘', comingSoon: false },
+  { href: '/chart/firdaria', icon: '⏳', iconBg: 'linear-gradient(135deg, #7b6cb818, #7b6cb808)', iconColor: '#7b6cb8', title: '法达星限', desc: '波斯时间主星系统', comingSoon: false },
   { href: '/chart/tarot', icon: '⊡', iconBg: 'linear-gradient(135deg, #b07cd018, #b07cd008)', iconColor: '#9070b0', title: '塔罗牌', desc: 'AI 塔罗解读', comingSoon: false },
   { href: '/chart/ziwei', icon: '☆', iconBg: 'linear-gradient(135deg, #d0a03018, #d0a03008)', iconColor: '#c09030', title: '紫微斗数', desc: '紫微排盘 + 解读', comingSoon: true },
   { href: '/chart/bazi', icon: '☰', iconBg: 'linear-gradient(135deg, #70a08018, #70a08008)', iconColor: '#609070', title: '国学八字', desc: '八字排盘 + 解读', comingSoon: true },

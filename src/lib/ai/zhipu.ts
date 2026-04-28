@@ -144,102 +144,6 @@ function fmtAspects(aspects: CompactAspect[], limit = 12): string {
     .map(a => `${a.planet1}${a.type}${a.planet2}(${a.orb}°)`).join(' | ');
 }
 
-function compressChartData(data: Record<string, unknown>): string {
-  const sections: string[] = [];
-
-  // Profile
-  const p = data.profile as Record<string, unknown> | undefined;
-  if (p) {
-    sections.push(`【用户】${p.name || ''} ${p.gender || ''} ${p.birthDate || ''} ${p.birthTime || ''} ${p.city || ''}`);
-  }
-
-  // Bazi
-  const bazi = data.bazi as Record<string, unknown> | undefined;
-  if (bazi) {
-    const fp = bazi.fourPillars as Record<string, Record<string, string>>;
-    const wx = bazi.wuxing as Record<string, string>;
-    const ss = bazi.shiShen as Record<string, Record<string, string>>;
-    let baziText = `【八字】${fp.year.ganZhi} ${fp.month.ganZhi} ${fp.day.ganZhi} ${fp.time.ganZhi}`;
-    baziText += `\n日主：${fp.day.gan}（${wx.day}） 五行：${wx.year} ${wx.month} ${wx.day} ${wx.time}`;
-    if (ss?.tianGan) baziText += `\n天干十神：${ss.tianGan.year} ${ss.tianGan.month} 日主 ${ss.tianGan.time}`;
-    if (bazi.nayin) {
-      const ny = bazi.nayin as Record<string, string>;
-      baziText += `\n纳音：${ny.year} ${ny.month} ${ny.day} ${ny.time}`;
-    }
-    if (bazi.mingGong) baziText += `\n命宫：${bazi.mingGong}`;
-    if (bazi.shengXiao) baziText += ` 生肖：${bazi.shengXiao}`;
-    if (bazi.dayun) {
-      const dayun = bazi.dayun as { startAge: number; ganZhi: string; startYear: number; endYear: number }[];
-      baziText += `\n大运：${dayun.map(d => `${d.ganZhi}(${d.startYear}-${d.endYear})`).join(' ')}`;
-    }
-    sections.push(baziText);
-  }
-
-  // Ziwei (major stars only)
-  const ziwei = data.ziwei as Record<string, unknown> | undefined;
-  if (ziwei) {
-    let zText = `【紫微】命主：${ziwei.destinyMaster} 身主：${ziwei.bodyMaster} ${ziwei.element}`;
-    const cells = ziwei.cells as { ground: string; temples: string[]; majorStars: { name: string; fourInfluence?: string }[]; ageRange?: string }[];
-    if (cells) {
-      zText += '\n' + cells.map(c => {
-        const temples = c.temples.join('/');
-        const stars = c.majorStars.map(s => s.name + (s.fourInfluence ? `(${s.fourInfluence})` : '')).join(' ');
-        return `${c.ground} [${temples}] ${stars}${c.ageRange ? ` (${c.ageRange})` : ''}`;
-      }).join('\n');
-    }
-    sections.push(zText);
-  }
-
-  // Natal chart
-  const natal = data.natalChart as Record<string, unknown> | undefined;
-  if (natal) {
-    let nText = '【本命盘】';
-    if (natal.planets) nText += '\n' + fmtPlanets(natal.planets as CompactPlanet[]);
-    if (natal.ascendant != null) nText += `\nASC ${(natal.ascendant as number).toFixed(1)}° MC ${(natal.midheaven as number).toFixed(1)}°`;
-    if (natal.houses) nText += '\n宫头：' + fmtHouses(natal.houses as CompactHouse[]);
-    if (natal.aspects) nText += '\n相位：' + fmtAspects(natal.aspects as CompactAspect[]);
-    sections.push(nText);
-  }
-
-  // Transit chart
-  const transit = data.transitChart as Record<string, unknown> | undefined;
-  if (transit) {
-    let tText = `【行运盘】${data.transitTime || ''}`;
-    if (transit.planets) tText += '\n' + fmtPlanets((transit.planets as CompactPlanet[]).slice(0, 10));
-    sections.push(tText);
-  }
-
-  // Cross aspects
-  const cross = data.crossAspects as CompactAspect[] | undefined;
-  if (cross?.length) {
-    sections.push('【行运×本命相位】' + fmtAspects(cross, 15));
-  }
-
-  // Solar return
-  const sr = data.solarReturn as Record<string, unknown> | undefined;
-  if (sr) {
-    const chart = sr.chart as Record<string, unknown>;
-    let sText = `【日返盘 ${sr.year || ''}年】`;
-    if (chart?.planets) sText += '\n' + fmtPlanets(chart.planets as CompactPlanet[]);
-    if (chart?.ascendant != null) sText += `\nASC ${(chart.ascendant as number).toFixed(1)}° MC ${(chart.midheaven as number).toFixed(1)}°`;
-    if (chart?.houses) sText += '\n宫头：' + fmtHouses(chart.houses as CompactHouse[]);
-    sections.push(sText);
-  }
-
-  // Lunar return
-  const lr = data.lunarReturn as Record<string, unknown> | undefined;
-  if (lr) {
-    const chart = lr.chart as Record<string, unknown>;
-    let lText = '【月返盘】';
-    if (chart?.planets) lText += '\n' + fmtPlanets(chart.planets as CompactPlanet[]);
-    if (chart?.ascendant != null) lText += `\nASC ${(chart.ascendant as number).toFixed(1)}° MC ${(chart.midheaven as number).toFixed(1)}°`;
-    if (chart?.houses) lText += '\n宫头：' + fmtHouses(chart.houses as CompactHouse[]);
-    sections.push(lText);
-  }
-
-  return sections.join('\n\n');
-}
-
 /* ═══════════════════════════════════════ */
 /* 意图专项 prompt 模板                      */
 /* ═══════════════════════════════════════ */
@@ -719,7 +623,7 @@ ${COMMON_RULES}`;
   }
 
   // ─── 全盘解读（默认）— 使用预注入洞察，7 张卡片填空模式 ───
-  const grouped = (() => { try { return extractGroupedInsights(chartData, intent); } catch { return null; } })();
+  const grouped = (() => { try { return extractGroupedInsights(chartData, intent); } catch (e) { console.error('[zhipu] extractGroupedInsights failed:', e); return null; } })();
 
   if (grouped && (grouped.sun.length > 0 || grouped.moon.length > 0)) {
     // 有结构化洞察：把洞察直接注入每张卡片，AI 只需填空和润色

@@ -345,7 +345,8 @@ function AstrologyContent() {
     if (!profile || chartType !== 'solar_return') return;
     const t = setTimeout(() => fetchReturn('solar_return'), 400);
     return () => clearTimeout(t);
-  }, [solarDate, solarHour, solarMinute]);
+    // solarHour/solarMinute intentionally excluded — solar return API only uses year
+  }, [solarDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!profile || chartType !== 'lunar_return') return;
@@ -369,7 +370,7 @@ function AstrologyContent() {
 
     if (chartType === 'natal' && natalData) {
       analysisType = 'natal';
-      chartData = { profile: profileInfo, astrology: natalData.chart };
+      chartData = { profile: profileInfo, natalChart: natalData.chart };
     } else if (chartType === 'transit' && transitData && natalData) {
       analysisType = 'transit';
       chartData = {

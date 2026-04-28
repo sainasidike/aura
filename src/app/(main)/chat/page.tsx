@@ -157,6 +157,7 @@ function ChatContent() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<Message[]>([]);
   const profileIdRef = useRef<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchMoved = useRef(false);
@@ -304,6 +305,7 @@ function ChatContent() {
   // Ref to track latest allChartData (avoids stale closure in async sendMessage)
   const allChartDataRef = useRef<Record<string, unknown> | null>(null);
   useEffect(() => { allChartDataRef.current = allChartData; }, [allChartData]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   const getChartData = (): Record<string, unknown> | null => {
     if (astroContext) return astroContext.chartData;
@@ -349,7 +351,7 @@ function ChatContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
+          messages: [...messagesRef.current, userMsg].map(m => ({ role: m.role, content: m.content })),
           chartData: getChartData(),
           ...(analysisType ? { analysisType } : {}),
           questionIntent,
@@ -536,15 +538,16 @@ function ChatContent() {
     // Find the user message before this assistant message
     let userMsgIndex = -1;
     for (let j = msgIndex - 1; j >= 0; j--) {
-      if (messages[j].role === 'user') { userMsgIndex = j; break; }
+      if (messagesRef.current[j].role === 'user') { userMsgIndex = j; break; }
     }
     if (userMsgIndex < 0) return;
-    const userContent = messages[userMsgIndex].content;
-    // Remove only the assistant response, keep the user message
-    // sendMessage will add a new user message, so remove both and re-send
-    setMessages(prev => prev.slice(0, userMsgIndex));
+    const userContent = messagesRef.current[userMsgIndex].content;
+    // Remove the user message and assistant response, then re-send
+    const sliced = messagesRef.current.slice(0, userMsgIndex);
+    setMessages(sliced);
+    messagesRef.current = sliced;
     setSuggestions([]);
-    setTimeout(() => sendMessage(userContent), 50);
+    sendMessage(userContent);
   };
 
   const handleShareSingle = async (msgIndex: number) => {

@@ -24,9 +24,6 @@ export async function POST(request: NextRequest) {
     // 构建完整消息列表
     const fullMessages: ZhipuMessage[] = [];
 
-    // Debug: 排查 chartData 是否传入
-    console.log('[chat] chartData present:', !!chartData, 'hasNatal:', !!(chartData as Record<string, unknown>)?.natalChart, 'intent:', questionIntent);
-
     // 添加系统 prompt
     if (chartData) {
       try {
@@ -50,7 +47,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    fullMessages.push(...messages);
+    // 限制对话历史长度，防止 token 溢出（保留最近 20 条消息）
+    const MAX_HISTORY = 20;
+    const trimmed = messages.length > MAX_HISTORY ? messages.slice(-MAX_HISTORY) : messages;
+    fullMessages.push(...trimmed);
 
     // 流式响应
     const encoder = new TextEncoder();

@@ -416,7 +416,7 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     ).sort((a, b) => a.orb - b.orb).slice(0, 2);
     for (const sa of sunAspects) {
       const other = sa.planet1 === '太阳' ? sa.planet2 : sa.planet1;
-      const meaning = getAspectMeaning('太阳', other, sa.type);
+      const meaning = getAspectMeaning('太阳', other, sa.type) || getPersonalOuterMeaning('太阳', other, sa.type);
       const mark = markAspectPriority(sa.type, sa.orb);
       if (meaning) result.sun.push(`${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`);
     }
@@ -456,7 +456,7 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     ).sort((a, b) => a.orb - b.orb).slice(0, 2);
     for (const ma of moonAspects) {
       const other = ma.planet1 === '月亮' ? ma.planet2 : ma.planet1;
-      const meaning = getAspectMeaning('月亮', other, ma.type);
+      const meaning = getAspectMeaning('月亮', other, ma.type) || getPersonalOuterMeaning('月亮', other, ma.type);
       const mark = markAspectPriority(ma.type, ma.orb);
       if (meaning) result.moon.push(`${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`);
     }
@@ -513,7 +513,8 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
   const loveAspectKeys = new Set<string>(); // 记录已输出的相位，防重复
   for (const va of venusAspects) {
     const other = va.planet1 === '金星' ? va.planet2 : va.planet1;
-    const meaning = getAspectMeaning('金星', other, va.type);
+    // 先查通用含义表，再 fallback 到个人-外行星含义表
+    const meaning = getAspectMeaning('金星', other, va.type) || getPersonalOuterMeaning('金星', other, va.type);
     const mark = markAspectPriority(va.type, va.orb);
     if (meaning) {
       result.love.push(`${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`);

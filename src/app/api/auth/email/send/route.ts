@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Send email
     if (resend) {
       await resend.emails.send({
-        from: 'Aura <noreply@resend.dev>',
+        from: 'Aura <onboarding@resend.dev>',
         to: email,
         subject: `Aura 登录验证码：${code}`,
         html: `

@@ -420,8 +420,9 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
       const mark = markAspectPriority(sa.type, sa.orb, '太阳', other, meaning);
       const expansion = getCoreAspectExpansion('太阳', other, sa.type, sa.orb, meaning, sa.type === '四分' || sa.type === '对冲' ? 'challenge' : 'gift');
       if (meaning) {
-        let text = `${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`;
-        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        const text = expansion
+          ? `${mark}太阳${sa.type}${other}（${sa.orb}°）：${expansion}`
+          : `${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`;
         result.sun.push(text);
       }
     }
@@ -465,8 +466,9 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
       const mark = markAspectPriority(ma.type, ma.orb, '月亮', other, meaning);
       const expansion = getCoreAspectExpansion('月亮', other, ma.type, ma.orb, meaning, ma.type === '四分' || ma.type === '对冲' ? 'challenge' : 'gift');
       if (meaning) {
-        let text = `${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`;
-        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        const text = expansion
+          ? `${mark}月亮${ma.type}${other}（${ma.orb}°）：${expansion}`
+          : `${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`;
         result.moon.push(text);
       }
     }
@@ -528,8 +530,9 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     const mark = markAspectPriority(va.type, va.orb, '金星', other, meaning);
     const expansion = getCoreAspectExpansion('金星', other, va.type, va.orb, meaning, va.type === '四分' || va.type === '对冲' ? 'challenge' : 'gift');
     if (meaning) {
-      let text = `${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`;
-      if (expansion) text += `\n↳ 展开分析：${expansion}`;
+      const text = expansion
+        ? `${mark}金星${va.type}${other}（${va.orb}°）：${expansion}`
+        : `${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`;
       result.love.push(text);
       loveAspectKeys.add(`金星+${other}`);
       loveAspectKeys.add(`${other}+金星`);
@@ -557,8 +560,9 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
       const mark = markAspectPriority(sa.type, sa.orb, p1, p2, meaning);
       const expansion = getCoreAspectExpansion(p1, p2, sa.type, sa.orb, meaning, sa.type === '四分' || sa.type === '对冲' ? 'challenge' : 'gift');
       if (meaning) {
-        let text = `${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${meaning}`;
-        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        const text = expansion
+          ? `${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${expansion}`
+          : `${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${meaning}`;
         result.love.push(text);
         loveAspectKeys.add(`${p1}+${p2}`);
         loveAspectKeys.add(`${p2}+${p1}`);
@@ -814,7 +818,7 @@ function getAspectMeaning(p1: string, p2: string, type: string): string {
       soft: '魅力和行动力结合，在追求喜欢的事物时既有品味又有执行力。感情中主动且有吸引力。',
     },
     '金星+土星': {
-      hard: '对感情和物质有深层不安全感，可能早期在爱或金钱上有匮乏体验。但这也塑造了极强的品味和对品质的鉴别力。感情晚熟但一旦稳定就极持久。',
+      hard: '对感情和物质有深层不安全感，可能早期在爱或金钱上有匮乏体验。选伴侣时标准高但又怕被拒绝，容易错过不完美但真诚的人。感情晚熟，30岁后感情质量反而更高。',
       soft: '对关系有务实态度，懂得长期经营。审美品味经得起时间考验，适合做需要耐心和品质的事。',
     },
     '金星+冥王星': {
@@ -852,7 +856,7 @@ function getPersonalOuterMeaning(p1: string, p2: string, type: string): string {
     '月亮-天王星': isHard ? '情绪变化突然且不可预测，对情感自由的需求极强。亲密关系中需要大量独处空间。' : '情感直觉敏锐，能快速感知变化。对非传统生活方式有天然亲和力。',
     '月亮-海王星': isHard ? '情感如海绵般吸收周围能量，容易被他人情绪影响。需要学会分辨"这是我的感受还是别人的"。' : '极度敏感细腻，有艺术和灵性天赋。梦境丰富，直觉准确。',
     '金星-天王星': isHard ? '感情模式非主流——突然爱上或突然冷淡，拒绝被束缚。可能经历闪恋闪分。' : '审美超前，感情观开放自由，吸引独特的人和关系形式。',
-    '金星-海王星': isHard ? '容易在感情中理想化对方，"爱上想象中的人"。失望后才看清真实，但这也给了你非凡的浪漫和创造力。' : '极致浪漫主义者，有将情感转化为艺术的天赋。',
+    '金星-海王星': isHard ? '容易在感情中理想化对方，"爱上想象中的人"——第一次约会时对方的小动作都被你解读成"命中注定"的信号。朋友提醒你"这人不太靠谱"时，你的第一反应是"他们不懂"。清醒建议：心动时写下对方3个客观缺点，写不出来就是海王星在运作。' : '极致浪漫主义者，有将情感转化为艺术的天赋。',
     '金星-冥王星': isHard ? '爱情对你来说不是小事——要么不爱，要么爱到骨子里。关系中有深层的权力和控制议题。' : '能建立深刻的灵魂连接，对爱的理解超越表面。',
     '火星-天王星': isHard ? '行为模式不可预测，容易冲动或突然改变方向。需要找到释放这股爆炸性能量的出口。' : '行动力和创新结合，擅长在危机中做出快速反应。',
     '火星-海王星': isHard ? '行动力被理想主义稀释——想做很多但容易分散精力。需要学会聚焦。' : '将激情投入理想，适合公益、艺术、灵性等需要奉献的领域。',
@@ -1063,7 +1067,7 @@ function getTSquareDetail(apex: string, apexHouse: number, base1: string, base2:
     '金星': '在感情和审美方面永远不满足，容易在"想要的"和"适合的"之间反复',
     '火星': '行动力被双向拉扯——想冲但总被拦，被拦又更想冲。容易急躁或以攻击性方式释放压力',
     '木星': '野心和能力之间有落差，容易过度承诺或膨胀，需要学会量力而行',
-    '土星': '人生中有一个持续的"卡点"——某个领域总是进展缓慢，但这也是你最终成就最大的地方',
+    '土星': '人生中有一个持续的"卡点"——某个领域总是进展缓慢。这个领域恰恰是你投入最多、最终收获最扎实的地方',
     '天王星': '生活中总有突变和打断，刚稳定下来又被推翻。但你因此培养了超强的适应能力',
     '海王星': '理想与现实的落差是核心痛点，容易被幻觉欺骗或逃避现实，但创造力也来自这种张力',
     '冥王星': '人生中反复经历"死亡与重生"，某些领域会被彻底摧毁再重建。痛苦但也因此拥有超乎常人的深度',
@@ -1132,7 +1136,7 @@ function getDignityScene(planet: string, status: 'domicile' | 'exalt' | 'detrime
       domicile: '信念坚定、格局大、运气好。在扩张和成长方面有天然优势',
       exalt: '善良和同理心被放大，适合教育、医疗、公益等助人行业',
       detriment: '视野可能过于关注细节而忽略全局，或信念不够坚定容易动摇',
-      fall: '乐观精神受限，容易悲观或过度谨慎。但这也让你更务实',
+      fall: '乐观精神受限，容易悲观或过度谨慎。好处是你比盲目乐观的人更脚踏实地',
     },
     '土星': {
       domicile: '自律、有耐心、能承担责任。在需要长期坚持的事业中有绝对优势',

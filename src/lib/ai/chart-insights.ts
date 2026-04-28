@@ -417,8 +417,13 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     for (const sa of sunAspects) {
       const other = sa.planet1 === '太阳' ? sa.planet2 : sa.planet1;
       const meaning = getAspectMeaning('太阳', other, sa.type) || getPersonalOuterMeaning('太阳', other, sa.type);
-      const mark = markAspectPriority(sa.type, sa.orb);
-      if (meaning) result.sun.push(`${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`);
+      const mark = markAspectPriority(sa.type, sa.orb, '太阳', other, meaning);
+      const expansion = getCoreAspectExpansion('太阳', other, sa.type, sa.orb, meaning, sa.type === '四分' || sa.type === '对冲' ? 'challenge' : 'gift');
+      if (meaning) {
+        let text = `${mark}太阳${sa.type}${other}（${sa.orb}°）：${meaning}`;
+        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        result.sun.push(text);
+      }
     }
   }
 
@@ -457,8 +462,13 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     for (const ma of moonAspects) {
       const other = ma.planet1 === '月亮' ? ma.planet2 : ma.planet1;
       const meaning = getAspectMeaning('月亮', other, ma.type) || getPersonalOuterMeaning('月亮', other, ma.type);
-      const mark = markAspectPriority(ma.type, ma.orb);
-      if (meaning) result.moon.push(`${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`);
+      const mark = markAspectPriority(ma.type, ma.orb, '月亮', other, meaning);
+      const expansion = getCoreAspectExpansion('月亮', other, ma.type, ma.orb, meaning, ma.type === '四分' || ma.type === '对冲' ? 'challenge' : 'gift');
+      if (meaning) {
+        let text = `${mark}月亮${ma.type}${other}（${ma.orb}°）：${meaning}`;
+        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        result.moon.push(text);
+      }
     }
   }
 
@@ -515,9 +525,12 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
     const other = va.planet1 === '金星' ? va.planet2 : va.planet1;
     // 先查通用含义表，再 fallback 到个人-外行星含义表
     const meaning = getAspectMeaning('金星', other, va.type) || getPersonalOuterMeaning('金星', other, va.type);
-    const mark = markAspectPriority(va.type, va.orb);
+    const mark = markAspectPriority(va.type, va.orb, '金星', other, meaning);
+    const expansion = getCoreAspectExpansion('金星', other, va.type, va.orb, meaning, va.type === '四分' || va.type === '对冲' ? 'challenge' : 'gift');
     if (meaning) {
-      result.love.push(`${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`);
+      let text = `${mark}金星${va.type}${other}（${va.orb}°）：${meaning}`;
+      if (expansion) text += `\n↳ 展开分析：${expansion}`;
+      result.love.push(text);
       loveAspectKeys.add(`金星+${other}`);
       loveAspectKeys.add(`${other}+金星`);
     }
@@ -541,9 +554,12 @@ export function extractGroupedInsights(data: Record<string, unknown>, questionIn
       const p1 = sa.planet1;
       const p2 = sa.planet2;
       const meaning = getAspectMeaning(p1, p2, sa.type);
-      const mark = markAspectPriority(sa.type, sa.orb);
+      const mark = markAspectPriority(sa.type, sa.orb, p1, p2, meaning);
+      const expansion = getCoreAspectExpansion(p1, p2, sa.type, sa.orb, meaning, sa.type === '四分' || sa.type === '对冲' ? 'challenge' : 'gift');
       if (meaning) {
-        result.love.push(`${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${meaning}`);
+        let text = `${mark}${p1}${sa.type}${p2}（${sa.orb}°）：${meaning}`;
+        if (expansion) text += `\n↳ 展开分析：${expansion}`;
+        result.love.push(text);
         loveAspectKeys.add(`${p1}+${p2}`);
         loveAspectKeys.add(`${p2}+${p1}`);
       }
@@ -671,12 +687,59 @@ function sortInsightsByIntent(insights: string[], intent: string): string[] {
   return [...high, ...normal];
 }
 
-/** 标记相位优先级 */
-function markAspectPriority(type: string, orb: number): string {
+/** 标记相位优先级，并为核心相位生成完整展开段落 */
+function markAspectPriority(type: string, orb: number, planet1?: string, planet2?: string, meaning?: string): string {
   const isHard = type === '四分' || type === '对冲';
-  if (isHard && orb <= 2.5) return '【核心挑战】';
-  if (!isHard && orb <= 1.5) return '【核心天赋】';
+  if (isHard && orb <= 2.5) {
+    // 核心挑战：生成完整展开段落
+    const expansion = getCoreAspectExpansion(planet1 || '', planet2 || '', type, orb, meaning || '', 'challenge');
+    return expansion ? `【核心挑战·必须重点展开】` : '【核心挑战】';
+  }
+  if (!isHard && orb <= 1.5) {
+    const expansion = getCoreAspectExpansion(planet1 || '', planet2 || '', type, orb, meaning || '', 'gift');
+    return expansion ? `【核心天赋·必须重点展开】` : '【核心天赋】';
+  }
   return '';
+}
+
+/** 为核心相位生成详细展开段落（AI只需润色，不需推理） */
+function getCoreAspectExpansion(p1: string, p2: string, type: string, orb: number, baseMeaning: string, kind: 'challenge' | 'gift'): string {
+  const key = [p1, p2].sort().join('+');
+
+  const expansions: Record<string, Record<string, string>> = {
+    '金星+海王星': {
+      challenge: `这是你整个盘里最需要警惕的感情陷阱（容许度仅${orb}°，非常紧密）。具体表现：你会不自觉地美化恋爱对象——第一次约会时对方的每个小动作都被你解读成"命中注定"的信号。当朋友提醒你"这个人不太靠谱"时，你内心的第一反应是"他们不懂我们之间的连接"。关系中你容易忽略红旗：对方迟到你觉得是"他太忙了"，对方冷暴力你觉得是"他需要空间"。清醒建议：下次心动时，拿出手机备忘录写下3个对方的客观缺点。如果你写不出来——那就是海王星在运作了。`,
+      gift: `你拥有把爱情变成艺术的天赋。你对美和浪漫的感知力超过大多数人——一首歌、一个眼神、一段文字都能让你感动到想哭。这种敏感度在创作和审美领域是无价的。`,
+    },
+    '金星+冥王星': {
+      challenge: `感情中的占有欲和控制欲是你最大的课题（容许度${orb}°）。你爱一个人的方式是"全部拥有"——不只是身体和时间，还有对方的注意力、社交圈、甚至想法。当伴侣和异性朋友多聊了几句，你表面平静但内心已经开始编织背叛的剧情。你需要学会的是：爱不等于控制，信任不等于监控。`,
+      gift: `你能建立极其深刻的灵魂连接——你的爱不是肤浅的。你懂得在感情中触及最真实的部分，这让你的关系有一种别人羡慕的深度。`,
+    },
+    '太阳+土星': {
+      challenge: `你从小就活在一种"必须证明自己"的压力下（容许度${orb}°）。可能是父亲要求严格，可能是家庭环境让你早熟。你对自己的标准高到不合理——别人觉得你已经很好了，你还觉得不够。在需要展现自信的场合（面试、演讲、表白），你总是先想到自己的不足。好消息是：这种压力在30岁之后会逐渐转化为真正的实力和权威感。`,
+      gift: `你的自律和责任感是天赋级别的（容许度${orb}°）。在需要长期坚持的事情上，你比绝大多数人更有耐心和毅力。这是"大器晚成"的经典配置。`,
+    },
+    '月亮+冥王星': {
+      challenge: `你的情绪像火山——表面看不出什么，但内部压力巨大（容许度${orb}°）。你可能经历过让你对"安全感"重新定义的家庭事件。在亲密关系中，你的直觉准到可怕——伴侣想隐瞒什么你一眼就看穿。但这种能力也让你容易陷入"控制性关怀"：以担心为名义查手机、分析对方的每一句话。成长方向：承认自己需要安全感不丢人，但获取安全感的方式可以不是"掌控一切"。`,
+      gift: `你的情感洞察力接近通灵级别——你能感知到别人没说出口的痛苦和需求。这在心理咨询、深度写作、危机处理等领域是无人能比的天赋。`,
+    },
+    '月亮+土星': {
+      challenge: `你从小就学会了"情绪要自己消化"（容许度${orb}°）。可能小时候哭的时候被说"别哭了"，可能家里没人问你"你今天开心吗"。长大后你对所有人都很体贴，但自己难过时第一反应是"不要麻烦别人"。你需要允许自己脆弱——下次想哭的时候，不要切到工作模式，试着给一个你信任的人发条消息说"我今天不太好"。`,
+      gift: `你的情感成熟度远超同龄人——在别人还在为小事崩溃时，你已经能冷静处理复杂局面。这种情感稳定性让你成为别人最信任的人。`,
+    },
+    '火星+冥王星': {
+      challenge: `你的意志力和执行力是"核弹级"的（容许度${orb}°）——一旦你决定要做什么，谁都拦不住。问题是这股力量如果没有正确的出口，就会变成控制欲、固执和破坏性冲动。在工作中你可能是"我的项目不允许失败"的类型。成长方向：学会区分"坚持"和"执念"——如果一件事已经证明不可行，及时止损不是认输。`,
+      gift: `你在困境中的爆发力和韧性超乎常人——别人觉得"完了"的时候，你才刚开始发力。这种"置之死地而后生"的特质让你适合所有高压、高风险的领域。`,
+    },
+    '太阳+冥王星': {
+      challenge: `你的人生注定不平庸——但代价是你会经历比别人更多的"归零重来"（容许度${orb}°）。可能是一段关系的彻底结束，可能是一份事业的推倒重建，可能是对自己身份认知的颠覆。每一次"死亡"都痛苦，但每一次"重生"后你都比之前更强。你最大的课题是学会不用"控制一切"来获得安全感。`,
+      gift: `你的洞察力和影响力是天赋级别的——你能看穿事物的本质，也能深刻影响你身边的人。你天生就是"转化者"——让坏的变好、让混乱变秩序。`,
+    },
+  };
+
+  const m = expansions[key];
+  if (!m) return '';
+  return m[kind] || '';
 }
 
 // ─── 辅助函数 ───

@@ -402,7 +402,7 @@ function DavisonContent() {
         {/* Chart Wheel */}
         {davisonChart && (
           <div className="mb-4 animate-fadeIn rounded-2xl p-4 flex justify-center" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
-            <NatalChartSVG chart={davisonChart} hideAskAI />
+            <NatalChartSVG chart={davisonChart} />
           </div>
         )}
 

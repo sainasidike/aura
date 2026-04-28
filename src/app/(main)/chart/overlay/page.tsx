@@ -415,7 +415,7 @@ function OverlayContent() {
               </button>
             </div>
             <div className="flex justify-center p-4">
-              <NatalChartSVG chart={overlayTab === 'aToB' ? overlayCharts.aToB : overlayCharts.bToA} hideAskAI />
+              <NatalChartSVG chart={overlayTab === 'aToB' ? overlayCharts.aToB : overlayCharts.bToA} />
             </div>
             {/* Planet-House Grid */}
             {(() => {

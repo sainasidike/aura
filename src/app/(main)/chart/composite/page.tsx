@@ -408,7 +408,7 @@ function CompositeContent() {
         {/* Chart Wheel */}
         {compositeChart && (
           <div className="mb-4 animate-fadeIn rounded-2xl p-4 flex justify-center" style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
-            <NatalChartSVG chart={compositeChart} hideAskAI />
+            <NatalChartSVG chart={compositeChart} />
           </div>
         )}
 

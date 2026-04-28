@@ -984,7 +984,7 @@ function CompatibilityContent() {
                   {/* Composite chart wheel */}
                   {compositeChartObj && (
                     <div className="mx-5 mt-3 mb-2 flex justify-center">
-                      <NatalChartSVG chart={compositeChartObj} hideAskAI />
+                      <NatalChartSVG chart={compositeChartObj} />
                     </div>
                   )}
                   {compositeReport && (() => {
@@ -1108,7 +1108,7 @@ function CompatibilityContent() {
                   {/* Davison chart wheel */}
                   {davisonChartObj && (
                     <div className="mx-5 mt-3 mb-2 flex justify-center">
-                      <NatalChartSVG chart={davisonChartObj} hideAskAI />
+                      <NatalChartSVG chart={davisonChartObj} />
                     </div>
                   )}
                   {davisonReport && (() => {

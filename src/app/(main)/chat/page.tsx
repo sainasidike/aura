@@ -726,7 +726,7 @@ function ChatContent() {
                               <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>本命星盘</span>
                             </div>
                             <div className="px-2 py-3">
-                              <NatalChartSVG chart={natal} hideAskAI />
+                              <NatalChartSVG chart={natal} />
                             </div>
                           </div>
                         </div>
@@ -892,7 +892,7 @@ function ChatContent() {
                             {/* SVG Chart */}
                             <div className="flex justify-center px-3 py-3" style={{ background: 'linear-gradient(180deg, rgba(123,108,184,0.03), transparent)' }}>
                               <div style={{ maxWidth: '240px', width: '100%' }}>
-                                <NatalChartSVG chart={displayChart} hideAskAI />
+                                <NatalChartSVG chart={displayChart} />
                               </div>
                             </div>
 
